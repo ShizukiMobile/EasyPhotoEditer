@@ -47,6 +47,7 @@ namespace EasyPhotoEditer
                     // 通常図形は全体をクリック・ドラッグ可能
                     MoveBorder.Background = Brushes.Transparent;
                     MoveBorder.BorderThickness = new Thickness(0);
+                    MoveBorder.BorderBrush = null;
                 }
             }
         }
@@ -110,49 +111,267 @@ namespace EasyPhotoEditer
             }
         }
 
-        #region リサイズハンドル処理
+        #region リサイズハンドル処理 (Shiftキーでの縦横比維持対応)
 
         private void Thumb_TopLeft_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            ResizeTop(e.VerticalChange);
-            ResizeLeft(e.HorizontalChange);
+            double curW = ActualWidth > 0 ? ActualWidth : Width;
+            double curH = ActualHeight > 0 ? ActualHeight : Height;
+            double curLeft = Canvas.GetLeft(this);
+            if (double.IsNaN(curLeft)) curLeft = 0;
+            double curTop = Canvas.GetTop(this);
+            if (double.IsNaN(curTop)) curTop = 0;
+
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && curH > 0)
+            {
+                double ratio = curW / curH;
+                double deltaX = -e.HorizontalChange;
+                double deltaY = -e.VerticalChange;
+
+                double newW, newH;
+                if (Math.Abs(deltaX) > Math.Abs(deltaY))
+                {
+                    newW = Math.Max(MinSize, curW + deltaX);
+                    newH = Math.Max(MinSize, newW / ratio);
+                    newW = newH * ratio;
+                }
+                else
+                {
+                    newH = Math.Max(MinSize, curH + deltaY);
+                    newW = Math.Max(MinSize, newH * ratio);
+                    newH = newW / ratio;
+                }
+
+                Canvas.SetLeft(this, curLeft + (curW - newW));
+                Canvas.SetTop(this, curTop + (curH - newH));
+                Width = newW;
+                Height = newH;
+            }
+            else
+            {
+                ResizeTop(e.VerticalChange);
+                ResizeLeft(e.HorizontalChange);
+            }
         }
 
         private void Thumb_TopRight_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            ResizeTop(e.VerticalChange);
-            ResizeRight(e.HorizontalChange);
+            double curW = ActualWidth > 0 ? ActualWidth : Width;
+            double curH = ActualHeight > 0 ? ActualHeight : Height;
+            double curTop = Canvas.GetTop(this);
+            if (double.IsNaN(curTop)) curTop = 0;
+
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && curH > 0)
+            {
+                double ratio = curW / curH;
+                double deltaX = e.HorizontalChange;
+                double deltaY = -e.VerticalChange;
+
+                double newW, newH;
+                if (Math.Abs(deltaX) > Math.Abs(deltaY))
+                {
+                    newW = Math.Max(MinSize, curW + deltaX);
+                    newH = Math.Max(MinSize, newW / ratio);
+                    newW = newH * ratio;
+                }
+                else
+                {
+                    newH = Math.Max(MinSize, curH + deltaY);
+                    newW = Math.Max(MinSize, newH * ratio);
+                    newH = newW / ratio;
+                }
+
+                Canvas.SetTop(this, curTop + (curH - newH));
+                Width = newW;
+                Height = newH;
+            }
+            else
+            {
+                ResizeTop(e.VerticalChange);
+                ResizeRight(e.HorizontalChange);
+            }
         }
 
         private void Thumb_BottomLeft_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            ResizeBottom(e.VerticalChange);
-            ResizeLeft(e.HorizontalChange);
+            double curW = ActualWidth > 0 ? ActualWidth : Width;
+            double curH = ActualHeight > 0 ? ActualHeight : Height;
+            double curLeft = Canvas.GetLeft(this);
+            if (double.IsNaN(curLeft)) curLeft = 0;
+
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && curH > 0)
+            {
+                double ratio = curW / curH;
+                double deltaX = -e.HorizontalChange;
+                double deltaY = e.VerticalChange;
+
+                double newW, newH;
+                if (Math.Abs(deltaX) > Math.Abs(deltaY))
+                {
+                    newW = Math.Max(MinSize, curW + deltaX);
+                    newH = Math.Max(MinSize, newW / ratio);
+                    newW = newH * ratio;
+                }
+                else
+                {
+                    newH = Math.Max(MinSize, curH + deltaY);
+                    newW = Math.Max(MinSize, newH * ratio);
+                    newH = newW / ratio;
+                }
+
+                Canvas.SetLeft(this, curLeft + (curW - newW));
+                Width = newW;
+                Height = newH;
+            }
+            else
+            {
+                ResizeBottom(e.VerticalChange);
+                ResizeLeft(e.HorizontalChange);
+            }
         }
 
         private void Thumb_BottomRight_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            ResizeBottom(e.VerticalChange);
-            ResizeRight(e.HorizontalChange);
+            double curW = ActualWidth > 0 ? ActualWidth : Width;
+            double curH = ActualHeight > 0 ? ActualHeight : Height;
+
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && curH > 0)
+            {
+                double ratio = curW / curH;
+                double deltaX = e.HorizontalChange;
+                double deltaY = e.VerticalChange;
+
+                double newW, newH;
+                if (Math.Abs(deltaX) > Math.Abs(deltaY))
+                {
+                    newW = Math.Max(MinSize, curW + deltaX);
+                    newH = Math.Max(MinSize, newW / ratio);
+                    newW = newH * ratio;
+                }
+                else
+                {
+                    newH = Math.Max(MinSize, curH + deltaY);
+                    newW = Math.Max(MinSize, newH * ratio);
+                    newH = newW / ratio;
+                }
+
+                Width = newW;
+                Height = newH;
+            }
+            else
+            {
+                ResizeBottom(e.VerticalChange);
+                ResizeRight(e.HorizontalChange);
+            }
         }
 
         private void Thumb_Top_DragDelta(object sender, DragDeltaEventArgs e)
         {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                double curW = ActualWidth > 0 ? ActualWidth : Width;
+                double curH = ActualHeight > 0 ? ActualHeight : Height;
+                double curLeft = Canvas.GetLeft(this);
+                if (double.IsNaN(curLeft)) curLeft = 0;
+                double curTop = Canvas.GetTop(this);
+                if (double.IsNaN(curTop)) curTop = 0;
+
+                if (curH > 0)
+                {
+                    double ratio = curW / curH;
+                    double newH = Math.Max(MinSize, curH - e.VerticalChange);
+                    double newW = Math.Max(MinSize, newH * ratio);
+                    newH = newW / ratio;
+
+                    Canvas.SetLeft(this, curLeft - (newW - curW) / 2);
+                    Canvas.SetTop(this, curTop + (curH - newH));
+                    Width = newW;
+                    Height = newH;
+                    return;
+                }
+            }
+
             ResizeTop(e.VerticalChange);
         }
 
         private void Thumb_Bottom_DragDelta(object sender, DragDeltaEventArgs e)
         {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                double curW = ActualWidth > 0 ? ActualWidth : Width;
+                double curH = ActualHeight > 0 ? ActualHeight : Height;
+                double curLeft = Canvas.GetLeft(this);
+                if (double.IsNaN(curLeft)) curLeft = 0;
+
+                if (curH > 0)
+                {
+                    double ratio = curW / curH;
+                    double newH = Math.Max(MinSize, curH + e.VerticalChange);
+                    double newW = Math.Max(MinSize, newH * ratio);
+                    newH = newW / ratio;
+
+                    Canvas.SetLeft(this, curLeft - (newW - curW) / 2);
+                    Width = newW;
+                    Height = newH;
+                    return;
+                }
+            }
+
             ResizeBottom(e.VerticalChange);
         }
 
         private void Thumb_Left_DragDelta(object sender, DragDeltaEventArgs e)
         {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                double curW = ActualWidth > 0 ? ActualWidth : Width;
+                double curH = ActualHeight > 0 ? ActualHeight : Height;
+                double curLeft = Canvas.GetLeft(this);
+                if (double.IsNaN(curLeft)) curLeft = 0;
+                double curTop = Canvas.GetTop(this);
+                if (double.IsNaN(curTop)) curTop = 0;
+
+                if (curH > 0)
+                {
+                    double ratio = curW / curH;
+                    double newW = Math.Max(MinSize, curW - e.HorizontalChange);
+                    double newH = Math.Max(MinSize, newW / ratio);
+                    newW = newH * ratio;
+
+                    Canvas.SetLeft(this, curLeft + (curW - newW));
+                    Canvas.SetTop(this, curTop - (newH - curH) / 2);
+                    Width = newW;
+                    Height = newH;
+                    return;
+                }
+            }
+
             ResizeLeft(e.HorizontalChange);
         }
 
         private void Thumb_Right_DragDelta(object sender, DragDeltaEventArgs e)
         {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                double curW = ActualWidth > 0 ? ActualWidth : Width;
+                double curH = ActualHeight > 0 ? ActualHeight : Height;
+                double curTop = Canvas.GetTop(this);
+                if (double.IsNaN(curTop)) curTop = 0;
+
+                if (curH > 0)
+                {
+                    double ratio = curW / curH;
+                    double newW = Math.Max(MinSize, curW + e.HorizontalChange);
+                    double newH = Math.Max(MinSize, newW / ratio);
+                    newW = newH * ratio;
+
+                    Canvas.SetTop(this, curTop - (newH - curH) / 2);
+                    Width = newW;
+                    Height = newH;
+                    return;
+                }
+            }
+
             ResizeRight(e.HorizontalChange);
         }
 

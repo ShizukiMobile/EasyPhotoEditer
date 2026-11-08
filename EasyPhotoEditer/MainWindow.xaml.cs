@@ -419,10 +419,18 @@ namespace EasyPhotoEditer
                 double width = Math.Abs(currentPoint.X - _drawStartPoint.X);
                 double height = Math.Abs(currentPoint.Y - _drawStartPoint.Y);
 
-                // 意図しない微小クリックを防ぎ、十分な大きさがあれば作成
+                // 意図しない微小ドラッグを防ぎ、十分な大きさがあれば作成
                 if (width >= 10 && height >= 10)
                 {
                     CreateAndInsertObject(_currentTool, x, y, width, height);
+                }
+                else if (_currentTool == ToolType.Circle)
+                {
+                    // 円ツールでクリック操作（または微小移動）された場合: 規定サイズ（直径80px）の真円を生成
+                    const double circleSize = 80.0;
+                    double circleLeft = Math.Clamp(_drawStartPoint.X - circleSize / 2, 0, Math.Max(0, ImageCanvas.Width - circleSize));
+                    double circleTop = Math.Clamp(_drawStartPoint.Y - circleSize / 2, 0, Math.Max(0, ImageCanvas.Height - circleSize));
+                    CreateAndInsertObject(ToolType.Circle, circleLeft, circleTop, circleSize, circleSize);
                 }
 
                 // 挿入後は選択ツールに戻す
