@@ -5,11 +5,12 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:EasyPhotoEditer"
         mc:Ignorable="d"
-        Title="EasyPhotoEditer" Height="600" Width="900"
+        Title="EasyPhotoEditer" Height="650" Width="950"
         AllowDrop="True"
         DragOver="Window_DragOver"
         Drop="Window_Drop"
-        Loaded="Window_Loaded">
+        Loaded="Window_Loaded"
+        KeyDown="Window_KeyDown">
     <Window.InputBindings>
         <KeyBinding Key="O" Modifiers="Control" Command="{x:Static local:MainWindow.OpenCommand}" />
         <KeyBinding Key="OemPlus" Modifiers="Control" Command="{x:Static local:MainWindow.ZoomInCommand}" />
@@ -26,6 +27,17 @@
                 <MenuItem Header="開く(_O)..." InputGestureText="Ctrl+O" Command="{x:Static local:MainWindow.OpenCommand}" />
                 <Separator />
                 <MenuItem Header="終了(_X)" Click="Exit_Click" />
+            </MenuItem>
+            <MenuItem Header="編集(_E)">
+                <MenuItem x:Name="MenuToolSelect" Header="選択ツール(_S)" IsCheckable="True" IsChecked="True" Click="MenuTool_Click" Tag="Select" />
+                <Separator />
+                <MenuItem x:Name="MenuToolTextBox" Header="テキストボックス(_T)" IsCheckable="True" Click="MenuTool_Click" Tag="TextBox" />
+                <MenuItem x:Name="MenuToolCircle" Header="丸（円）(_C)" IsCheckable="True" Click="MenuTool_Click" Tag="Circle" />
+                <MenuItem x:Name="MenuToolRectangle" Header="四角形(_R)" IsCheckable="True" Click="MenuTool_Click" Tag="Rectangle" />
+                <MenuItem x:Name="MenuToolRoundedRectangle" Header="角丸四角形(_U)" IsCheckable="True" Click="MenuTool_Click" Tag="RoundedRectangle" />
+                <MenuItem x:Name="MenuToolCheckmark" Header="チェックマーク(_M)" IsCheckable="True" Click="MenuTool_Click" Tag="Checkmark" />
+                <Separator />
+                <MenuItem Header="選択した図形を削除(_D)" InputGestureText="Delete" Click="MenuDelete_Click" />
             </MenuItem>
             <MenuItem Header="表示(_V)">
                 <MenuItem Header="ズームイン(_I)" InputGestureText="Ctrl++" Command="{x:Static local:MainWindow.ZoomInCommand}" />
@@ -45,6 +57,10 @@
             <Separator />
             <StatusBarItem>
                 <TextBlock x:Name="CanvasSizeText" Text="サイズ: -" />
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <TextBlock x:Name="CurrentToolText" Text="ツール: 選択" />
             </StatusBarItem>
             <Separator />
             <StatusBarItem HorizontalAlignment="Right">
@@ -92,10 +108,21 @@
                         <!-- キャンバス: 画像ピクセルサイズに一致 -->
                         <Canvas x:Name="ImageCanvas"
                                 Background="White"
-                                ClipToBounds="True">
+                                ClipToBounds="True"
+                                MouseLeftButtonDown="ImageCanvas_MouseLeftButtonDown"
+                                MouseMove="ImageCanvas_MouseMove"
+                                MouseLeftButtonUp="ImageCanvas_MouseLeftButtonUp">
                             <Image x:Name="CanvasImage"
                                    Stretch="None"
                                    RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                            <!-- ドラッグ作成時のプレビュー枠 -->
+                            <Rectangle x:Name="RubberBand"
+                                       Stroke="#0078D7"
+                                       StrokeThickness="1.5"
+                                       StrokeDashArray="3,3"
+                                       Fill="#220078D7"
+                                       Visibility="Collapsed"
+                                       IsHitTestVisible="False" />
                         </Canvas>
                     </Border>
                 </Grid>

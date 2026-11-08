@@ -1,12 +1,26 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using Microsoft.Win32;
+using Path = System.IO.Path;
+using WpfPath = System.Windows.Shapes.Path;
 
 namespace EasyPhotoEditer
 {
+    public enum ToolType
+    {
+        Select,
+        TextBox,
+        Circle,
+        Rectangle,
+        RoundedRectangle,
+        Checkmark
+    }
+
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
@@ -26,6 +40,12 @@ namespace EasyPhotoEditer
         private double _currentZoom = 1.0;
         private readonly string? _initialFilePath;
 
+        // ツールとオブジェクト編集状態
+        private ToolType _currentTool = ToolType.Select;
+        private EditableItem? _selectedItem;
+        private bool _isDrawing;
+        private Point _drawStartPoint;
+
         public MainWindow() : this(null)
         {
         }
@@ -36,6 +56,7 @@ namespace EasyPhotoEditer
             _initialFilePath = initialFilePath;
 
             RegisterCommands();
+            UpdateToolMenuState();
         }
 
         private void RegisterCommands()
@@ -56,6 +77,8 @@ namespace EasyPhotoEditer
             }
         }
 
+        #region 画像ロード・D&D処理
+
         private void ExecuteOpenCommand(object sender, ExecutedRoutedEventArgs e)
         {
             var dialog = new OpenFileDialog
@@ -69,104 +92,6 @@ namespace EasyPhotoEditer
             if (dialog.ShowDialog(this) == true)
             {
                 LoadImageFromFile(dialog.FileName);
-            }
-        }
-
-        private void MainScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            // 要求仕様: 「Ctrl + ホイール」でズーム
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
-            {
-                e.Handled = true;
-
-                if (CanvasContainer.Visibility != Visibility.Visible)
-                {
-                    return;
-                }
-
-                double factor = e.Delta > 0 ? ZoomStepFactor : (1.0 / ZoomStepFactor);
-                Point mousePos = e.GetPosition(MainScrollViewer);
-                ZoomAt(mousePos, _currentZoom * factor);
-            }
-        }
-
-        private void ZoomRelative(double factor)
-        {
-            if (CanvasContainer.Visibility != Visibility.Visible)
-            {
-                return;
-            }
-
-            // メニュー等からの操作はScrollViewerの中心を基準にズーム
-            Point center = new(MainScrollViewer.ViewportWidth / 2, MainScrollViewer.ViewportHeight / 2);
-            ZoomAt(center, _currentZoom * factor);
-        }
-
-        private void ZoomAt(Point centerInViewer, double targetZoom)
-        {
-            targetZoom = Math.Clamp(targetZoom, MinZoom, MaxZoom);
-            if (Math.Abs(_currentZoom - targetZoom) < 0.0001)
-            {
-                return;
-            }
-
-            // マウス位置が指すコンテンツ上の絶対座標（ズーム1.0換算）
-            double contentX = (centerInViewer.X + MainScrollViewer.HorizontalOffset) / _currentZoom;
-            double contentY = (centerInViewer.Y + MainScrollViewer.VerticalOffset) / _currentZoom;
-
-            SetZoom(targetZoom);
-            MainScrollViewer.UpdateLayout();
-
-            // ズーム後も同じコンテンツ位置がマウス位置に来るようスクロール位置を調整
-            double newOffsetX = contentX * _currentZoom - centerInViewer.X;
-            double newOffsetY = contentY * _currentZoom - centerInViewer.Y;
-            MainScrollViewer.ScrollToHorizontalOffset(newOffsetX);
-            MainScrollViewer.ScrollToVerticalOffset(newOffsetY);
-        }
-
-        private void SetZoom(double zoom)
-        {
-            _currentZoom = Math.Clamp(zoom, MinZoom, MaxZoom);
-
-            CanvasScaleTransform.ScaleX = _currentZoom;
-            CanvasScaleTransform.ScaleY = _currentZoom;
-
-            // 等倍以上はドットをくっきり表示（NearestNeighbor）、縮小時は滑らかに表示（HighQuality）
-            RenderOptions.SetBitmapScalingMode(CanvasImage, _currentZoom >= 1.0 ? BitmapScalingMode.NearestNeighbor : BitmapScalingMode.HighQuality);
-
-            ZoomPercentText.Text = $"ズーム: {Math.Round(_currentZoom * 100):0}%";
-        }
-
-        private void ExecuteFitToWindow()
-        {
-            if (CanvasContainer.Visibility != Visibility.Visible || ImageCanvas.Width <= 0 || ImageCanvas.Height <= 0)
-            {
-                return;
-            }
-
-            // スクロールバー余白などを考慮した表示可能サイズ
-            double availableWidth = MainScrollViewer.ViewportWidth > 40 ? MainScrollViewer.ViewportWidth - 40 : MainScrollViewer.ActualWidth - 40;
-            double availableHeight = MainScrollViewer.ViewportHeight > 40 ? MainScrollViewer.ViewportHeight - 40 : MainScrollViewer.ActualHeight - 40;
-
-            if (availableWidth > 0 && availableHeight > 0)
-            {
-                double scaleX = availableWidth / ImageCanvas.Width;
-                double scaleY = availableHeight / ImageCanvas.Height;
-                SetZoom(Math.Min(scaleX, scaleY));
-            }
-        }
-
-        private void ExecuteFitToWidth()
-        {
-            if (CanvasContainer.Visibility != Visibility.Visible || ImageCanvas.Width <= 0)
-            {
-                return;
-            }
-
-            double availableWidth = MainScrollViewer.ViewportWidth > 40 ? MainScrollViewer.ViewportWidth - 40 : MainScrollViewer.ActualWidth - 40;
-            if (availableWidth > 0)
-            {
-                SetZoom(availableWidth / ImageCanvas.Width);
             }
         }
 
@@ -227,6 +152,14 @@ namespace EasyPhotoEditer
                 int pixelWidth = bitmap.PixelWidth;
                 int pixelHeight = bitmap.PixelHeight;
 
+                // 既存のオブジェクト（EditableItem）をクリア
+                var itemsToRemove = ImageCanvas.Children.OfType<EditableItem>().ToList();
+                foreach (var item in itemsToRemove)
+                {
+                    ImageCanvas.Children.Remove(item);
+                }
+                _selectedItem = null;
+
                 ImageCanvas.Width = pixelWidth;
                 ImageCanvas.Height = pixelHeight;
 
@@ -237,8 +170,8 @@ namespace EasyPhotoEditer
                 CanvasContainer.Visibility = Visibility.Visible;
                 EmptyGuidePanel.Visibility = Visibility.Collapsed;
 
-                // 画像ロード時は 100% ズームにリセット
                 SetZoom(1.0);
+                SetCurrentTool(ToolType.Select);
 
                 string fileName = Path.GetFileName(filePath);
                 Title = $"{fileName} ({pixelWidth} × {pixelHeight} px) - EasyPhotoEditer";
@@ -260,5 +193,398 @@ namespace EasyPhotoEditer
                 _ => false,
             };
         }
+
+        #endregion
+
+        #region ズーム処理
+
+        private void MainScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                e.Handled = true;
+
+                if (CanvasContainer.Visibility != Visibility.Visible)
+                {
+                    return;
+                }
+
+                double factor = e.Delta > 0 ? ZoomStepFactor : (1.0 / ZoomStepFactor);
+                Point mousePos = e.GetPosition(MainScrollViewer);
+                ZoomAt(mousePos, _currentZoom * factor);
+            }
+        }
+
+        private void ZoomRelative(double factor)
+        {
+            if (CanvasContainer.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            Point center = new(MainScrollViewer.ViewportWidth / 2, MainScrollViewer.ViewportHeight / 2);
+            ZoomAt(center, _currentZoom * factor);
+        }
+
+        private void ZoomAt(Point centerInViewer, double targetZoom)
+        {
+            targetZoom = Math.Clamp(targetZoom, MinZoom, MaxZoom);
+            if (Math.Abs(_currentZoom - targetZoom) < 0.0001)
+            {
+                return;
+            }
+
+            double contentX = (centerInViewer.X + MainScrollViewer.HorizontalOffset) / _currentZoom;
+            double contentY = (centerInViewer.Y + MainScrollViewer.VerticalOffset) / _currentZoom;
+
+            SetZoom(targetZoom);
+            MainScrollViewer.UpdateLayout();
+
+            double newOffsetX = contentX * _currentZoom - centerInViewer.X;
+            double newOffsetY = contentY * _currentZoom - centerInViewer.Y;
+            MainScrollViewer.ScrollToHorizontalOffset(newOffsetX);
+            MainScrollViewer.ScrollToVerticalOffset(newOffsetY);
+        }
+
+        private void SetZoom(double zoom)
+        {
+            _currentZoom = Math.Clamp(zoom, MinZoom, MaxZoom);
+
+            CanvasScaleTransform.ScaleX = _currentZoom;
+            CanvasScaleTransform.ScaleY = _currentZoom;
+
+            RenderOptions.SetBitmapScalingMode(CanvasImage, _currentZoom >= 1.0 ? BitmapScalingMode.NearestNeighbor : BitmapScalingMode.HighQuality);
+
+            ZoomPercentText.Text = $"ズーム: {Math.Round(_currentZoom * 100):0}%";
+        }
+
+        private void ExecuteFitToWindow()
+        {
+            if (CanvasContainer.Visibility != Visibility.Visible || ImageCanvas.Width <= 0 || ImageCanvas.Height <= 0)
+            {
+                return;
+            }
+
+            double availableWidth = MainScrollViewer.ViewportWidth > 40 ? MainScrollViewer.ViewportWidth - 40 : MainScrollViewer.ActualWidth - 40;
+            double availableHeight = MainScrollViewer.ViewportHeight > 40 ? MainScrollViewer.ViewportHeight - 40 : MainScrollViewer.ActualHeight - 40;
+
+            if (availableWidth > 0 && availableHeight > 0)
+            {
+                double scaleX = availableWidth / ImageCanvas.Width;
+                double scaleY = availableHeight / ImageCanvas.Height;
+                SetZoom(Math.Min(scaleX, scaleY));
+            }
+        }
+
+        private void ExecuteFitToWidth()
+        {
+            if (CanvasContainer.Visibility != Visibility.Visible || ImageCanvas.Width <= 0)
+            {
+                return;
+            }
+
+            double availableWidth = MainScrollViewer.ViewportWidth > 40 ? MainScrollViewer.ViewportWidth - 40 : MainScrollViewer.ActualWidth - 40;
+            if (availableWidth > 0)
+            {
+                SetZoom(availableWidth / ImageCanvas.Width);
+            }
+        }
+
+        #endregion
+
+        #region ツール選択・図形挿入・編集
+
+        private void MenuTool_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem && menuItem.Tag is string tag)
+            {
+                if (Enum.TryParse<ToolType>(tag, out var tool))
+                {
+                    SetCurrentTool(tool);
+                }
+            }
+        }
+
+        private void SetCurrentTool(ToolType tool)
+        {
+            _currentTool = tool;
+            UpdateToolMenuState();
+
+            // ツール変更時のカーソル設定
+            ImageCanvas.Cursor = tool == ToolType.Select ? Cursors.Arrow : Cursors.Cross;
+
+            // 挿入ツールに切り替えた際は既存オブジェクトの選択を解除
+            if (tool != ToolType.Select)
+            {
+                DeselectAll();
+            }
+        }
+
+        private void UpdateToolMenuState()
+        {
+            MenuToolSelect.IsChecked = _currentTool == ToolType.Select;
+            MenuToolTextBox.IsChecked = _currentTool == ToolType.TextBox;
+            MenuToolCircle.IsChecked = _currentTool == ToolType.Circle;
+            MenuToolRectangle.IsChecked = _currentTool == ToolType.Rectangle;
+            MenuToolRoundedRectangle.IsChecked = _currentTool == ToolType.RoundedRectangle;
+            MenuToolCheckmark.IsChecked = _currentTool == ToolType.Checkmark;
+
+            string toolName = _currentTool switch
+            {
+                ToolType.Select => "選択",
+                ToolType.TextBox => "テキストボックス",
+                ToolType.Circle => "丸（円）",
+                ToolType.Rectangle => "四角形",
+                ToolType.RoundedRectangle => "角丸四角形",
+                ToolType.Checkmark => "チェックマーク",
+                _ => "選択"
+            };
+            CurrentToolText.Text = $"ツール: {toolName}";
+        }
+
+        private void ImageCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (CanvasContainer.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            Point clickPoint = e.GetPosition(ImageCanvas);
+
+            if (_currentTool == ToolType.Checkmark)
+            {
+                // チェックマーク: クリックで位置を指定して挿入（デフォルトサイズ 48x48）
+                const double checkSize = 48.0;
+                double left = Math.Clamp(clickPoint.X - checkSize / 2, 0, Math.Max(0, ImageCanvas.Width - checkSize));
+                double top = Math.Clamp(clickPoint.Y - checkSize / 2, 0, Math.Max(0, ImageCanvas.Height - checkSize));
+
+                CreateAndInsertObject(ToolType.Checkmark, left, top, checkSize, checkSize);
+                SetCurrentTool(ToolType.Select);
+                e.Handled = true;
+                return;
+            }
+
+            if (_currentTool != ToolType.Select)
+            {
+                // 前4つ（テキストボックス、丸、四角形、角丸四角形）: ドラッグ開始
+                _isDrawing = true;
+                _drawStartPoint = clickPoint;
+
+                Canvas.SetLeft(RubberBand, _drawStartPoint.X);
+                Canvas.SetTop(RubberBand, _drawStartPoint.Y);
+                RubberBand.Width = 0;
+                RubberBand.Height = 0;
+                RubberBand.Visibility = Visibility.Visible;
+
+                ImageCanvas.CaptureMouse();
+                e.Handled = true;
+                return;
+            }
+
+            // 選択モードでキャンバス背景（画像またはキャンバス余白）をクリックした場合のみ選択解除
+            if (e.OriginalSource == ImageCanvas || e.OriginalSource == CanvasImage)
+            {
+                DeselectAll();
+            }
+        }
+
+        private void ImageCanvas_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDrawing)
+            {
+                Point currentPoint = e.GetPosition(ImageCanvas);
+                double x = Math.Min(_drawStartPoint.X, currentPoint.X);
+                double y = Math.Min(_drawStartPoint.Y, currentPoint.Y);
+                double width = Math.Abs(currentPoint.X - _drawStartPoint.X);
+                double height = Math.Abs(currentPoint.Y - _drawStartPoint.Y);
+
+                Canvas.SetLeft(RubberBand, x);
+                Canvas.SetTop(RubberBand, y);
+                RubberBand.Width = width;
+                RubberBand.Height = height;
+            }
+        }
+
+        private void ImageCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDrawing)
+            {
+                _isDrawing = false;
+                ImageCanvas.ReleaseMouseCapture();
+                RubberBand.Visibility = Visibility.Collapsed;
+
+                Point currentPoint = e.GetPosition(ImageCanvas);
+                double x = Math.Min(_drawStartPoint.X, currentPoint.X);
+                double y = Math.Min(_drawStartPoint.Y, currentPoint.Y);
+                double width = Math.Abs(currentPoint.X - _drawStartPoint.X);
+                double height = Math.Abs(currentPoint.Y - _drawStartPoint.Y);
+
+                // 意図しない微小クリックを防ぎ、十分な大きさがあれば作成
+                if (width >= 10 && height >= 10)
+                {
+                    CreateAndInsertObject(_currentTool, x, y, width, height);
+                }
+
+                // 挿入後は選択ツールに戻す
+                SetCurrentTool(ToolType.Select);
+                e.Handled = true;
+            }
+        }
+
+        private void CreateAndInsertObject(ToolType tool, double x, double y, double width, double height)
+        {
+            var item = new EditableItem
+            {
+                Width = width,
+                Height = height
+            };
+
+            Canvas.SetLeft(item, x);
+            Canvas.SetTop(item, y);
+
+            TextBox? textControl = null;
+
+            switch (tool)
+            {
+                case ToolType.TextBox:
+                    item.IsTextBox = true;
+                    textControl = new TextBox
+                    {
+                        Text = "テキストを入力",
+                        Foreground = Brushes.Red,
+                        Background = Brushes.Transparent,
+                        BorderBrush = Brushes.Red,
+                        BorderThickness = new Thickness(1.5),
+                        FontSize = 18,
+                        FontFamily = new FontFamily("Yu Gothic UI, Segoe UI, Meiryo, sans-serif"),
+                        AcceptsReturn = true,
+                        TextWrapping = TextWrapping.Wrap,
+                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                    };
+                    item.ItemContent = textControl;
+                    break;
+
+                case ToolType.Circle:
+                    item.ItemContent = new Ellipse
+                    {
+                        Stroke = Brushes.Red,
+                        StrokeThickness = 3,
+                        Fill = Brushes.Transparent
+                    };
+                    break;
+
+                case ToolType.Rectangle:
+                    item.ItemContent = new System.Windows.Shapes.Rectangle
+                    {
+                        Stroke = Brushes.Red,
+                        StrokeThickness = 3,
+                        Fill = Brushes.Transparent
+                    };
+                    break;
+
+                case ToolType.RoundedRectangle:
+                    item.ItemContent = new System.Windows.Shapes.Rectangle
+                    {
+                        Stroke = Brushes.Red,
+                        StrokeThickness = 3,
+                        Fill = Brushes.Transparent,
+                        RadiusX = 16,
+                        RadiusY = 16
+                    };
+                    break;
+
+                case ToolType.Checkmark:
+                    var path = new WpfPath
+                    {
+                        Data = Geometry.Parse("M 4,22 L 15,33 L 38,8"),
+                        Stroke = Brushes.Red,
+                        StrokeThickness = 4.5,
+                        StrokeStartLineCap = PenLineCap.Round,
+                        StrokeEndLineCap = PenLineCap.Round,
+                        StrokeLineJoin = PenLineJoin.Round
+                    };
+                    item.ItemContent = new Viewbox
+                    {
+                        Stretch = Stretch.Uniform,
+                        Child = path
+                    };
+                    break;
+            }
+
+            item.Selected += (s, e) => SelectItem(item);
+            ImageCanvas.Children.Add(item);
+
+            // 挿入直後に選択状態にする
+            SelectItem(item);
+
+            // テキストボックスの場合は即座に入力可能にする
+            if (textControl != null)
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    textControl.Focus();
+                    textControl.SelectAll();
+                }, System.Windows.Threading.DispatcherPriority.Input);
+            }
+        }
+
+        private void SelectItem(EditableItem item)
+        {
+            if (_selectedItem == item)
+            {
+                return;
+            }
+
+            if (_selectedItem != null)
+            {
+                _selectedItem.IsSelected = false;
+            }
+
+            _selectedItem = item;
+            _selectedItem.IsSelected = true;
+        }
+
+        private void DeselectAll()
+        {
+            if (_selectedItem != null)
+            {
+                _selectedItem.IsSelected = false;
+                _selectedItem = null;
+            }
+        }
+
+        private void DeleteSelectedItem()
+        {
+            if (_selectedItem != null)
+            {
+                ImageCanvas.Children.Remove(_selectedItem);
+                _selectedItem = null;
+            }
+        }
+
+        private void MenuDelete_Click(object sender, RoutedEventArgs e)
+        {
+            DeleteSelectedItem();
+        }
+
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Delete)
+            {
+                // テキストボックス入力中は文字削除を優先する
+                if (Keyboard.FocusedElement is TextBox)
+                {
+                    return;
+                }
+
+                if (_selectedItem != null)
+                {
+                    DeleteSelectedItem();
+                    e.Handled = true;
+                }
+            }
+        }
+
+        #endregion
     }
 }
