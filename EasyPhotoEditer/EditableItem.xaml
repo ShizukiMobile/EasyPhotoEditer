@@ -49,36 +49,44 @@
             <Thumb Style="{StaticResource ResizeThumbStyle}"
                    HorizontalAlignment="Left" VerticalAlignment="Top"
                    Cursor="SizeNWSE" Margin="0"
+                   DragStarted="Thumb_DragStarted" DragCompleted="Thumb_DragCompleted"
                    DragDelta="Thumb_TopLeft_DragDelta" />
             <Thumb Style="{StaticResource ResizeThumbStyle}"
                    HorizontalAlignment="Right" VerticalAlignment="Top"
                    Cursor="SizeNESW" Margin="0"
+                   DragStarted="Thumb_DragStarted" DragCompleted="Thumb_DragCompleted"
                    DragDelta="Thumb_TopRight_DragDelta" />
             <Thumb Style="{StaticResource ResizeThumbStyle}"
                    HorizontalAlignment="Left" VerticalAlignment="Bottom"
                    Cursor="SizeNESW" Margin="0"
+                   DragStarted="Thumb_DragStarted" DragCompleted="Thumb_DragCompleted"
                    DragDelta="Thumb_BottomLeft_DragDelta" />
             <Thumb Style="{StaticResource ResizeThumbStyle}"
                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
                    Cursor="SizeNWSE" Margin="0"
+                   DragStarted="Thumb_DragStarted" DragCompleted="Thumb_DragCompleted"
                    DragDelta="Thumb_BottomRight_DragDelta" />
 
             <!-- 上下左右の中央 -->
             <Thumb Style="{StaticResource ResizeThumbStyle}"
                    HorizontalAlignment="Center" VerticalAlignment="Top"
                    Cursor="SizeNS" Margin="0"
+                   DragStarted="Thumb_DragStarted" DragCompleted="Thumb_DragCompleted"
                    DragDelta="Thumb_Top_DragDelta" />
             <Thumb Style="{StaticResource ResizeThumbStyle}"
                    HorizontalAlignment="Center" VerticalAlignment="Bottom"
                    Cursor="SizeNS" Margin="0"
+                   DragStarted="Thumb_DragStarted" DragCompleted="Thumb_DragCompleted"
                    DragDelta="Thumb_Bottom_DragDelta" />
             <Thumb Style="{StaticResource ResizeThumbStyle}"
                    HorizontalAlignment="Left" VerticalAlignment="Center"
                    Cursor="SizeWE" Margin="0"
+                   DragStarted="Thumb_DragStarted" DragCompleted="Thumb_DragCompleted"
                    DragDelta="Thumb_Left_DragDelta" />
             <Thumb Style="{StaticResource ResizeThumbStyle}"
                    HorizontalAlignment="Right" VerticalAlignment="Center"
                    Cursor="SizeWE" Margin="0"
+                   DragStarted="Thumb_DragStarted" DragCompleted="Thumb_DragCompleted"
                    DragDelta="Thumb_Right_DragDelta" />
         </Grid>
     </Grid>

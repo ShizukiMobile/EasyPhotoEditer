@@ -40,6 +40,9 @@ namespace EasyPhotoEditer
         private double _currentZoom = 1.0;
         private readonly string? _initialFilePath;
 
+        // Undo/Redo マネージャー
+        private readonly UndoManager _undoManager = new();
+
         // ツールとオブジェクト編集状態
         private ToolType _currentTool = ToolType.Select;
         private EditableItem? _selectedItem;
@@ -67,6 +70,11 @@ namespace EasyPhotoEditer
             CommandBindings.Add(new CommandBinding(ResetZoomCommand, (s, e) => SetZoom(1.0)));
             CommandBindings.Add(new CommandBinding(FitToWindowCommand, (s, e) => ExecuteFitToWindow()));
             CommandBindings.Add(new CommandBinding(FitToWidthCommand, (s, e) => ExecuteFitToWidth()));
+
+            // 元に戻す (Ctrl+Z) / やり直す (Ctrl+Y)
+            CommandBindings.Add(new CommandBinding(ApplicationCommands.Undo, (s, e) => _undoManager.Undo(), (s, e) => e.CanExecute = _undoManager.CanUndo));
+            CommandBindings.Add(new CommandBinding(ApplicationCommands.Redo, (s, e) => _undoManager.Redo(), (s, e) => e.CanExecute = _undoManager.CanRedo));
+            _undoManager.StateChanged += (s, e) => CommandManager.InvalidateRequerySuggested();
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -152,13 +160,14 @@ namespace EasyPhotoEditer
                 int pixelWidth = bitmap.PixelWidth;
                 int pixelHeight = bitmap.PixelHeight;
 
-                // 既存のオブジェクト（EditableItem）をクリア
+                // 既存のオブジェクト（EditableItem）とUndo履歴をクリア
                 var itemsToRemove = ImageCanvas.Children.OfType<EditableItem>().ToList();
                 foreach (var item in itemsToRemove)
                 {
                     ImageCanvas.Children.Remove(item);
                 }
                 _selectedItem = null;
+                _undoManager.Clear();
 
                 ImageCanvas.Width = pixelWidth;
                 ImageCanvas.Height = pixelHeight;
@@ -470,6 +479,18 @@ namespace EasyPhotoEditer
                         VerticalScrollBarVisibility = ScrollBarVisibility.Auto
                     };
                     item.ItemContent = textControl;
+
+                    // テキスト変更時の Undo/Redo 追跡
+                    string textBefore = textControl.Text;
+                    textControl.GotFocus += (s, e) => textBefore = textControl.Text;
+                    textControl.LostFocus += (s, e) =>
+                    {
+                        if (textControl.Text != textBefore)
+                        {
+                            _undoManager.Record(new TextChangedAction(textControl, textBefore, textControl.Text));
+                            textBefore = textControl.Text;
+                        }
+                    };
                     break;
 
                 case ToolType.Circle:
@@ -520,7 +541,12 @@ namespace EasyPhotoEditer
             }
 
             item.Selected += (s, e) => SelectItem(item);
+            item.TransformCompleted += (s, e) => _undoManager.Record(new TransformObjectAction(item, e.Before, e.After, SelectItem));
+
             ImageCanvas.Children.Add(item);
+
+            // Undo にオブジェクト追加アクションを記録
+            _undoManager.Record(new AddObjectAction(ImageCanvas, item, SelectItem));
 
             // 挿入直後に選択状態にする
             SelectItem(item);
@@ -536,8 +562,14 @@ namespace EasyPhotoEditer
             }
         }
 
-        private void SelectItem(EditableItem item)
+        private void SelectItem(EditableItem? item)
         {
+            if (item == null)
+            {
+                DeselectAll();
+                return;
+            }
+
             if (_selectedItem == item)
             {
                 return;
@@ -565,7 +597,9 @@ namespace EasyPhotoEditer
         {
             if (_selectedItem != null)
             {
-                ImageCanvas.Children.Remove(_selectedItem);
+                var itemToDelete = _selectedItem;
+                _undoManager.Record(new DeleteObjectAction(ImageCanvas, itemToDelete, SelectItem));
+                ImageCanvas.Children.Remove(itemToDelete);
                 _selectedItem = null;
             }
         }

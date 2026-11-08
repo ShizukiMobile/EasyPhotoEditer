@@ -6,6 +6,18 @@ using System.Windows.Media;
 
 namespace EasyPhotoEditer
 {
+    public class TransformEventArgs : EventArgs
+    {
+        public Rect Before { get; }
+        public Rect After { get; }
+
+        public TransformEventArgs(Rect before, Rect after)
+        {
+            Before = before;
+            After = after;
+        }
+    }
+
     public partial class EditableItem : UserControl
     {
         private const double MinSize = 16.0;
@@ -14,10 +26,13 @@ namespace EasyPhotoEditer
         private Point _dragStartPoint;
         private double _originalLeft;
         private double _originalTop;
+        private Rect _dragStartRect;
+        private Rect _resizeStartRect;
         private bool _isSelected;
         private bool _isTextBox;
 
         public event EventHandler? Selected;
+        public event EventHandler<TransformEventArgs>? TransformCompleted;
 
         public bool IsSelected
         {
@@ -64,6 +79,17 @@ namespace EasyPhotoEditer
             IsTextBox = false;
         }
 
+        public Rect GetCurrentRect()
+        {
+            double left = Canvas.GetLeft(this);
+            if (double.IsNaN(left)) left = 0;
+            double top = Canvas.GetTop(this);
+            if (double.IsNaN(top)) top = 0;
+            double width = ActualWidth > 0 ? ActualWidth : Width;
+            double height = ActualHeight > 0 ? ActualHeight : Height;
+            return new Rect(left, top, width, height);
+        }
+
         private void UserControl_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Selected?.Invoke(this, EventArgs.Empty);
@@ -77,10 +103,9 @@ namespace EasyPhotoEditer
             {
                 _isDragging = true;
                 _dragStartPoint = e.GetPosition(canvas);
-                _originalLeft = Canvas.GetLeft(this);
-                if (double.IsNaN(_originalLeft)) _originalLeft = 0;
-                _originalTop = Canvas.GetTop(this);
-                if (double.IsNaN(_originalTop)) _originalTop = 0;
+                _dragStartRect = GetCurrentRect();
+                _originalLeft = _dragStartRect.X;
+                _originalTop = _dragStartRect.Y;
 
                 MoveBorder.CaptureMouse();
                 e.Handled = true;
@@ -107,11 +132,35 @@ namespace EasyPhotoEditer
             {
                 _isDragging = false;
                 MoveBorder.ReleaseMouseCapture();
+
+                var endRect = GetCurrentRect();
+                if (Math.Abs(endRect.X - _dragStartRect.X) > 0.5 || Math.Abs(endRect.Y - _dragStartRect.Y) > 0.5)
+                {
+                    TransformCompleted?.Invoke(this, new TransformEventArgs(_dragStartRect, endRect));
+                }
+
                 e.Handled = true;
             }
         }
 
-        #region リサイズハンドル処理 (Shiftキーでの縦横比維持対応)
+        #region リサイズハンドル処理 (Shiftキーでの縦横比維持対応 & Undo/Redo通知)
+
+        private void Thumb_DragStarted(object sender, DragStartedEventArgs e)
+        {
+            _resizeStartRect = GetCurrentRect();
+        }
+
+        private void Thumb_DragCompleted(object sender, DragCompletedEventArgs e)
+        {
+            var endRect = GetCurrentRect();
+            if (Math.Abs(endRect.X - _resizeStartRect.X) > 0.5 ||
+                Math.Abs(endRect.Y - _resizeStartRect.Y) > 0.5 ||
+                Math.Abs(endRect.Width - _resizeStartRect.Width) > 0.5 ||
+                Math.Abs(endRect.Height - _resizeStartRect.Height) > 0.5)
+            {
+                TransformCompleted?.Invoke(this, new TransformEventArgs(_resizeStartRect, endRect));
+            }
+        }
 
         private void Thumb_TopLeft_DragDelta(object sender, DragDeltaEventArgs e)
         {
@@ -336,7 +385,7 @@ namespace EasyPhotoEditer
                     double ratio = curW / curH;
                     double newW = Math.Max(MinSize, curW - e.HorizontalChange);
                     double newH = Math.Max(MinSize, newW / ratio);
-                    newW = newH * ratio;
+                    newH = newW / ratio;
 
                     Canvas.SetLeft(this, curLeft + (curW - newW));
                     Canvas.SetTop(this, curTop - (newH - curH) / 2);
@@ -363,7 +412,7 @@ namespace EasyPhotoEditer
                     double ratio = curW / curH;
                     double newW = Math.Max(MinSize, curW + e.HorizontalChange);
                     double newH = Math.Max(MinSize, newW / ratio);
-                    newW = newH * ratio;
+                    newH = newW / ratio;
 
                     Canvas.SetTop(this, curTop - (newH - curH) / 2);
                     Width = newW;

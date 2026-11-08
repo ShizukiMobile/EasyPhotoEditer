@@ -13,6 +13,8 @@
         KeyDown="Window_KeyDown">
     <Window.InputBindings>
         <KeyBinding Key="O" Modifiers="Control" Command="{x:Static local:MainWindow.OpenCommand}" />
+        <KeyBinding Key="Z" Modifiers="Control" Command="ApplicationCommands.Undo" />
+        <KeyBinding Key="Y" Modifiers="Control" Command="ApplicationCommands.Redo" />
         <KeyBinding Key="OemPlus" Modifiers="Control" Command="{x:Static local:MainWindow.ZoomInCommand}" />
         <KeyBinding Key="Add" Modifiers="Control" Command="{x:Static local:MainWindow.ZoomInCommand}" />
         <KeyBinding Key="OemMinus" Modifiers="Control" Command="{x:Static local:MainWindow.ZoomOutCommand}" />
@@ -29,6 +31,9 @@
                 <MenuItem Header="終了(_X)" Click="Exit_Click" />
             </MenuItem>
             <MenuItem Header="編集(_E)">
+                <MenuItem Header="元に戻す(_U)" InputGestureText="Ctrl+Z" Command="ApplicationCommands.Undo" />
+                <MenuItem Header="やり直す(_R)" InputGestureText="Ctrl+Y" Command="ApplicationCommands.Redo" />
+                <Separator />
                 <MenuItem x:Name="MenuToolSelect" Header="選択ツール(_S)" IsCheckable="True" IsChecked="True" Click="MenuTool_Click" Tag="Select" />
                 <Separator />
                 <MenuItem x:Name="MenuToolTextBox" Header="テキストボックス(_T)" IsCheckable="True" Click="MenuTool_Click" Tag="TextBox" />
