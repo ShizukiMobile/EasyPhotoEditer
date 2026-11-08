@@ -12,6 +12,12 @@
         Loaded="Window_Loaded">
     <Window.InputBindings>
         <KeyBinding Key="O" Modifiers="Control" Command="{x:Static local:MainWindow.OpenCommand}" />
+        <KeyBinding Key="OemPlus" Modifiers="Control" Command="{x:Static local:MainWindow.ZoomInCommand}" />
+        <KeyBinding Key="Add" Modifiers="Control" Command="{x:Static local:MainWindow.ZoomInCommand}" />
+        <KeyBinding Key="OemMinus" Modifiers="Control" Command="{x:Static local:MainWindow.ZoomOutCommand}" />
+        <KeyBinding Key="Subtract" Modifiers="Control" Command="{x:Static local:MainWindow.ZoomOutCommand}" />
+        <KeyBinding Key="D0" Modifiers="Control" Command="{x:Static local:MainWindow.ResetZoomCommand}" />
+        <KeyBinding Key="NumPad0" Modifiers="Control" Command="{x:Static local:MainWindow.ResetZoomCommand}" />
     </Window.InputBindings>
     <DockPanel>
         <!-- メニューバー -->
@@ -21,6 +27,14 @@
                 <Separator />
                 <MenuItem Header="終了(_X)" Click="Exit_Click" />
             </MenuItem>
+            <MenuItem Header="表示(_V)">
+                <MenuItem Header="ズームイン(_I)" InputGestureText="Ctrl++" Command="{x:Static local:MainWindow.ZoomInCommand}" />
+                <MenuItem Header="ズームアウト(_O)" InputGestureText="Ctrl+-" Command="{x:Static local:MainWindow.ZoomOutCommand}" />
+                <MenuItem Header="100% に戻す(_R)" InputGestureText="Ctrl+0" Command="{x:Static local:MainWindow.ResetZoomCommand}" />
+                <Separator />
+                <MenuItem Header="全体を表示（ウィンドウに合わせる）(_F)" Command="{x:Static local:MainWindow.FitToWindowCommand}" />
+                <MenuItem Header="ウィンドウの横幅に合わせる(_W)" Command="{x:Static local:MainWindow.FitToWidthCommand}" />
+            </MenuItem>
         </Menu>
 
         <!-- ステータスバー -->
@@ -29,8 +43,12 @@
                 <TextBlock x:Name="StatusInfoText" Text="準備完了" />
             </StatusBarItem>
             <Separator />
-            <StatusBarItem HorizontalAlignment="Right">
+            <StatusBarItem>
                 <TextBlock x:Name="CanvasSizeText" Text="サイズ: -" />
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock x:Name="ZoomPercentText" Text="ズーム: 100%" />
             </StatusBarItem>
         </StatusBar>
 
@@ -54,15 +72,20 @@
             </StackPanel>
 
             <!-- キャンバス表示用スクロールビューアー -->
-            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+            <ScrollViewer x:Name="MainScrollViewer"
+                          HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Auto"
-                          Padding="20">
+                          Padding="20"
+                          PreviewMouseWheel="MainScrollViewer_PreviewMouseWheel">
                 <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <!-- キャンバスのコンテナ (ドロップシャドウ・枠線付き) -->
+                    <!-- キャンバスのコンテナ (ドロップシャドウ・枠線・拡大縮小トランスフォーム付き) -->
                     <Border x:Name="CanvasContainer"
                             BorderBrush="#111111"
                             BorderThickness="1"
                             Visibility="Collapsed">
+                        <Border.LayoutTransform>
+                            <ScaleTransform x:Name="CanvasScaleTransform" ScaleX="1.0" ScaleY="1.0" />
+                        </Border.LayoutTransform>
                         <Border.Effect>
                             <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="2" Opacity="0.6" />
                         </Border.Effect>
@@ -72,7 +95,7 @@
                                 ClipToBounds="True">
                             <Image x:Name="CanvasImage"
                                    Stretch="None"
-                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                                   RenderOptions.BitmapScalingMode="NearestNeighbor" />
                         </Canvas>
                     </Border>
                 </Grid>
