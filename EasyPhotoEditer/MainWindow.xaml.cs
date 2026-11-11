@@ -303,9 +303,9 @@ namespace EasyPhotoEditer
 
         #region ツール選択・図形挿入・編集
 
-        private void MenuTool_Click(object sender, RoutedEventArgs e)
+        private void ToolItem_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is MenuItem menuItem && menuItem.Tag is string tag)
+            if (sender is FrameworkElement fe && fe.Tag is string tag)
             {
                 if (Enum.TryParse<ToolType>(tag, out var tool))
                 {
@@ -331,12 +331,21 @@ namespace EasyPhotoEditer
 
         private void UpdateToolMenuState()
         {
+            // メニューバー項目の更新
             MenuToolSelect.IsChecked = _currentTool == ToolType.Select;
             MenuToolTextBox.IsChecked = _currentTool == ToolType.TextBox;
             MenuToolCircle.IsChecked = _currentTool == ToolType.Circle;
             MenuToolRectangle.IsChecked = _currentTool == ToolType.Rectangle;
             MenuToolRoundedRectangle.IsChecked = _currentTool == ToolType.RoundedRectangle;
             MenuToolCheckmark.IsChecked = _currentTool == ToolType.Checkmark;
+
+            // ツールバーボタン項目の更新
+            if (TbToolSelect != null) TbToolSelect.IsChecked = _currentTool == ToolType.Select;
+            if (TbToolTextBox != null) TbToolTextBox.IsChecked = _currentTool == ToolType.TextBox;
+            if (TbToolCircle != null) TbToolCircle.IsChecked = _currentTool == ToolType.Circle;
+            if (TbToolRectangle != null) TbToolRectangle.IsChecked = _currentTool == ToolType.Rectangle;
+            if (TbToolRoundedRectangle != null) TbToolRoundedRectangle.IsChecked = _currentTool == ToolType.RoundedRectangle;
+            if (TbToolCheckmark != null) TbToolCheckmark.IsChecked = _currentTool == ToolType.Checkmark;
 
             string toolName = _currentTool switch
             {
