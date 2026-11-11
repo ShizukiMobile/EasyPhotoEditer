@@ -169,4 +169,19 @@ namespace EasyPhotoEditer
             _textBox.Text = _after;
         }
     }
+
+    public class StyleChangeAction : IUndoableAction
+    {
+        private readonly Action _applyBefore;
+        private readonly Action _applyAfter;
+
+        public StyleChangeAction(Action applyBefore, Action applyAfter)
+        {
+            _applyBefore = applyBefore;
+            _applyAfter = applyAfter;
+        }
+
+        public void Undo() => _applyBefore();
+        public void Redo() => _applyAfter();
+    }
 }

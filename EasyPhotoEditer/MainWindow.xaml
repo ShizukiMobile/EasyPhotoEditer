@@ -5,12 +5,13 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:EasyPhotoEditer"
         mc:Ignorable="d"
-        Title="EasyPhotoEditer" Height="650" Width="950"
+        Title="EasyPhotoEditer" Height="650" Width="980"
         AllowDrop="True"
         DragOver="Window_DragOver"
         Drop="Window_Drop"
         Loaded="Window_Loaded"
-        KeyDown="Window_KeyDown">
+        KeyDown="Window_KeyDown"
+        Closing="Window_Closing">
     <Window.Resources>
         <!-- ツールバー用通常ボタンスタイル -->
         <Style x:Key="ToolbarButtonStyle" TargetType="Button">
@@ -85,6 +86,138 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- ダークテーマ ComboBoxItem スタイル -->
+        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Foreground" Value="#E0E0E0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#3E3E42" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#094771" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ダークテーマ ComboBox ToggleButton テンプレート -->
+        <ControlTemplate x:Key="DarkComboBoxToggleButton" TargetType="ToggleButton">
+            <Border x:Name="border"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                    </Grid.ColumnDefinitions>
+                    <Path x:Name="arrow" Grid.Column="1"
+                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                          Fill="#AAAAAA"
+                          Data="M 0,0 L 3.5,4 L 7,0 Z" />
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="border" Property="Background" Value="#3E3E42" />
+                    <Setter TargetName="border" Property="BorderBrush" Value="#0078D7" />
+                    <Setter TargetName="arrow" Property="Fill" Value="#FFFFFF" />
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter TargetName="border" Property="BorderBrush" Value="#0078D7" />
+                    <Setter TargetName="arrow" Property="Fill" Value="#0078D7" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- ツールバー用ダークテーマ ComboBox スタイル -->
+        <Style x:Key="DarkComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="#E0E0E0" />
+            <Setter Property="Background" Value="#333337" />
+            <Setter Property="BorderBrush" Value="#454545" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItemStyle}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="toggleButton"
+                                          Template="{StaticResource DarkComboBoxToggleButton}"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press" />
+                            <ContentPresenter x:Name="contentPresenter"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                              Margin="6,0,20,0"
+                                              VerticalAlignment="Center"
+                                              IsHitTestVisible="False" />
+                            <TextBox x:Name="PART_EditableTextBox"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Center"
+                                     Margin="4,0,20,0"
+                                     Focusable="True"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{TemplateBinding Foreground}"
+                                     CaretBrush="#FFFFFF"
+                                     Visibility="Hidden"
+                                     IsReadOnly="{TemplateBinding IsReadOnly}" />
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Slide">
+                                <Border x:Name="dropDownBorder"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="260"
+                                        Background="#252526"
+                                        BorderBrush="#454545"
+                                        BorderThickness="1"
+                                        CornerRadius="3"
+                                        Margin="0,2,0,0">
+                                    <ScrollViewer x:Name="DropDownScrollViewer" SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEditable" Value="True">
+                                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="contentPresenter" Property="Visibility" Value="Hidden" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     <Window.InputBindings>
         <KeyBinding Key="O" Modifiers="Control" Command="{x:Static local:MainWindow.OpenCommand}" />
@@ -102,6 +235,8 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="ファイル(_F)">
                 <MenuItem Header="開く(_O)..." InputGestureText="Ctrl+O" Command="{x:Static local:MainWindow.OpenCommand}" />
+                <Separator />
+                <MenuItem Header="オプション(_P)..." Click="Options_Click" />
                 <Separator />
                 <MenuItem Header="終了(_X)" Click="Exit_Click" />
             </MenuItem>
@@ -238,6 +373,71 @@
                               Data="M 3,11 L 8,16 L 19,4" />
                     </Viewbox>
                 </RadioButton>
+
+                <Rectangle Width="1" Height="20" Fill="#3F3F46" Margin="8,0" VerticalAlignment="Center" />
+
+                <!-- テキストボックスのフォント -->
+                <TextBlock Text="フォント:" VerticalAlignment="Center" Foreground="#AAAAAA" Margin="2,0,4,0" FontSize="11" />
+                <ComboBox x:Name="CbFontFamily"
+                          Style="{StaticResource DarkComboBoxStyle}"
+                          Width="140" Height="26"
+                          Margin="2,0"
+                          VerticalAlignment="Center"
+                          SelectionChanged="CbFontFamily_SelectionChanged"
+                          ToolTip="テキストボックスのフォント" />
+
+                <!-- 文字サイズ -->
+                <TextBlock Text="サイズ:" VerticalAlignment="Center" Foreground="#AAAAAA" Margin="6,0,4,0" FontSize="11" />
+                <ComboBox x:Name="CbFontSize"
+                          Style="{StaticResource DarkComboBoxStyle}"
+                          Width="58" Height="26"
+                          Margin="2,0"
+                          IsEditable="True"
+                          VerticalAlignment="Center"
+                          SelectionChanged="CbFontSize_SelectionChanged"
+                          LostFocus="CbFontSize_LostFocus"
+                          KeyDown="CbFontSize_KeyDown"
+                          ToolTip="文字サイズ (pt)" />
+
+                <Rectangle Width="1" Height="20" Fill="#3F3F46" Margin="8,0" VerticalAlignment="Center" />
+
+                <!-- 線の色 / 文字色 -->
+                <TextBlock Text="色:" VerticalAlignment="Center" Foreground="#AAAAAA" Margin="2,0,4,0" FontSize="11" />
+                <ComboBox x:Name="CbStrokeColor"
+                          Style="{StaticResource DarkComboBoxStyle}"
+                          Width="95" Height="26"
+                          Margin="2,0"
+                          VerticalAlignment="Center"
+                          SelectionChanged="CbStrokeColor_SelectionChanged"
+                          ToolTip="図形の枠線色 / 文字色">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="14" Height="14" Background="{Binding Brush}" BorderBrush="#444" BorderThickness="1" CornerRadius="2" Margin="0,0,6,0" />
+                                <TextBlock Text="{Binding Name}" FontSize="12" Foreground="#E0E0E0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <!-- 線の太さ -->
+                <TextBlock Text="太さ:" VerticalAlignment="Center" Foreground="#AAAAAA" Margin="6,0,4,0" FontSize="11" />
+                <ComboBox x:Name="CbStrokeThickness"
+                          Style="{StaticResource DarkComboBoxStyle}"
+                          Width="88" Height="26"
+                          Margin="2,0"
+                          VerticalAlignment="Center"
+                          SelectionChanged="CbStrokeThickness_SelectionChanged"
+                          ToolTip="図形の枠線の太さ">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Rectangle Width="{Binding PreviewWidth}" Height="{Binding Value}" Fill="#DDD" VerticalAlignment="Center" Margin="{Binding PreviewMargin}" />
+                                <TextBlock Text="{Binding DisplayText}" FontSize="12" Foreground="#E0E0E0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
             </StackPanel>
         </Border>
 
