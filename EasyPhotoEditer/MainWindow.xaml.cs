@@ -238,9 +238,8 @@ namespace EasyPhotoEditer
         {
             if (_settings.ConfirmOnExit)
             {
-                string message = "EasyPhotoEditerを閉じます。よろしいですか？\n保存していない編集内容がある場合、終了すると変更はすべて失われます。";
-                var result = MessageBox.Show(this, message, "終了の確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (result != MessageBoxResult.Yes)
+                var dialog = new ConfirmExitDialog { Owner = this };
+                if (dialog.ShowDialog() != true)
                 {
                     e.Cancel = true;
                 }
