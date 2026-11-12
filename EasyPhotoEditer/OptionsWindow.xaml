@@ -258,6 +258,19 @@
                         <CheckBox x:Name="ChkConfirmOnExit" Content="終了前に確認する" />
                         <TextBlock Text="アプリケーション終了時に、未保存の変更に対する確認ダイアログを表示します。"
                                    FontSize="11" Foreground="#888888" Margin="22,2,0,0" TextWrapping="Wrap" />
+
+                        <TextBlock Text="画像をドラッグ＆ドロップしたときの動作" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,20,0,8" />
+                        <Border Height="1" Background="#3F3F46" Margin="0,0,0,10" />
+
+                        <RadioButton x:Name="RbDragDropOpenNew"
+                                     Style="{StaticResource StandardRadioStyle}"
+                                     GroupName="DragDropActionGroup"
+                                     Content="画像を新しく開く"
+                                     IsChecked="True" />
+                        <RadioButton x:Name="RbDragDropComposite"
+                                     Style="{StaticResource StandardRadioStyle}"
+                                     GroupName="DragDropActionGroup"
+                                     Content="画像を編集中の画像に合成する" />
                     </StackPanel>
 
                     <!-- 編集設定パネル -->

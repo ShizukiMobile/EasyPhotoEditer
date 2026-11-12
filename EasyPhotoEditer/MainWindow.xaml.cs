@@ -248,7 +248,16 @@ namespace EasyPhotoEditer
 
             if (dialog.ShowDialog(this) == true)
             {
-                LoadImageFromFile(dialog.FileName);
+                if (CanvasContainer != null && CanvasContainer.Visibility == Visibility.Visible)
+                {
+                    // 既存の編集内容を保持するため、新しいウィンドウで開く
+                    var newWindow = new MainWindow(dialog.FileName);
+                    newWindow.Show();
+                }
+                else
+                {
+                    LoadImageFromFile(dialog.FileName);
+                }
             }
         }
 
@@ -383,9 +392,25 @@ namespace EasyPhotoEditer
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (files != null && files.Length > 0)
+                if (files != null && files.Length > 0 && IsSupportedImageFile(files[0]))
                 {
-                    LoadImageFromFile(files[0]);
+                    string filePath = files[0];
+                    if (CanvasContainer != null && CanvasContainer.Visibility == Visibility.Visible)
+                    {
+                        if (_settings.DragDropBehavior == DragDropBehavior.OpenNew)
+                        {
+                            var newWindow = new MainWindow(filePath);
+                            newWindow.Show();
+                        }
+                        else
+                        {
+                            // TODO: 画像を編集中の画像に合成する機能の実装
+                        }
+                    }
+                    else
+                    {
+                        LoadImageFromFile(filePath);
+                    }
                 }
             }
         }

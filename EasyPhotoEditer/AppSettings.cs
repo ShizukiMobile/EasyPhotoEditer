@@ -13,12 +13,24 @@ namespace EasyPhotoEditer
         DragToSpecify
     }
 
+    public enum DragDropBehavior
+    {
+        [JsonPropertyName("OpenNew")]
+        OpenNew,
+
+        [JsonPropertyName("Composite")]
+        Composite
+    }
+
     public class AppSettings
     {
         private static readonly string SettingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
         // 一般設定
         public bool ConfirmOnExit { get; set; } = true;
+
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public DragDropBehavior DragDropBehavior { get; set; } = DragDropBehavior.OpenNew;
 
         // 編集設定: デフォルト値
         public string DefaultFontFamily { get; set; } = "メイリオ";

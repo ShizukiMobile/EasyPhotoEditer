@@ -80,6 +80,14 @@ namespace EasyPhotoEditer
         {
             // 一般
             ChkConfirmOnExit.IsChecked = CurrentSettings.ConfirmOnExit;
+            if (CurrentSettings.DragDropBehavior == DragDropBehavior.OpenNew)
+            {
+                RbDragDropOpenNew.IsChecked = true;
+            }
+            else
+            {
+                RbDragDropComposite.IsChecked = true;
+            }
 
             // 編集: フォント
             if (CbDefaultFont.ItemsSource is List<FontItem> fonts)
@@ -145,6 +153,9 @@ namespace EasyPhotoEditer
         {
             // 一般
             CurrentSettings.ConfirmOnExit = ChkConfirmOnExit.IsChecked == true;
+            CurrentSettings.DragDropBehavior = RbDragDropOpenNew.IsChecked == true
+                ? DragDropBehavior.OpenNew
+                : DragDropBehavior.Composite;
 
             // 編集: フォント
             if (CbDefaultFont.SelectedItem is FontItem fi)
