@@ -53,6 +53,7 @@ namespace EasyPhotoEditer
     {
         public static readonly RoutedUICommand OpenCommand = new("開く", "OpenCommand", typeof(MainWindow));
         public static readonly RoutedUICommand SaveCommand = new("編集した画像を保存", "SaveCommand", typeof(MainWindow));
+        public static readonly RoutedUICommand InsertImageCommand = new("画像の挿入", "InsertImageCommand", typeof(MainWindow));
         public static readonly RoutedUICommand ZoomInCommand = new("ズームイン", "ZoomInCommand", typeof(MainWindow));
         public static readonly RoutedUICommand ZoomOutCommand = new("ズームアウト", "ZoomOutCommand", typeof(MainWindow));
         public static readonly RoutedUICommand ResetZoomCommand = new("100% に戻す", "ResetZoomCommand", typeof(MainWindow));
@@ -104,6 +105,7 @@ namespace EasyPhotoEditer
         {
             CommandBindings.Add(new CommandBinding(OpenCommand, ExecuteOpenCommand));
             CommandBindings.Add(new CommandBinding(SaveCommand, ExecuteSaveCommand, CanExecuteSaveCommand));
+            CommandBindings.Add(new CommandBinding(InsertImageCommand, ExecuteInsertImageCommand, CanExecuteInsertImageCommand));
             CommandBindings.Add(new CommandBinding(ZoomInCommand, (s, e) => ZoomRelative(ZoomStepFactor)));
             CommandBindings.Add(new CommandBinding(ZoomOutCommand, (s, e) => ZoomRelative(1.0 / ZoomStepFactor)));
             CommandBindings.Add(new CommandBinding(ResetZoomCommand, (s, e) => SetZoom(1.0)));
@@ -266,6 +268,118 @@ namespace EasyPhotoEditer
             e.CanExecute = CanvasContainer != null && CanvasContainer.Visibility == Visibility.Visible;
         }
 
+        private void CanExecuteInsertImageCommand(object sender, CanExecuteRoutedEventArgs e)
+        {
+            e.CanExecute = CanvasContainer != null && CanvasContainer.Visibility == Visibility.Visible;
+        }
+
+        private void ExecuteInsertImageCommand(object sender, ExecutedRoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "挿入する画像を選択",
+                Filter = "画像ファイル (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|すべてのファイル (*.*)|*.*",
+                FilterIndex = 1,
+                Multiselect = false
+            };
+
+            if (dialog.ShowDialog(this) == true)
+            {
+                InsertImageFromFile(dialog.FileName, null);
+            }
+        }
+
+        private void InsertImageFromFile(string filePath, Point? dropPosition)
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                {
+                    MessageBox.Show(this, "指定された画像ファイルが見つかりません。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                var bitmap = new BitmapImage();
+                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    bitmap.BeginInit();
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.StreamSource = stream;
+                    bitmap.EndInit();
+                }
+                bitmap.Freeze();
+
+                double imgWidth = bitmap.PixelWidth;
+                double imgHeight = bitmap.PixelHeight;
+
+                // ベース画像の解像度サイズ
+                double canvasWidth = ImageCanvas.Width;
+                double canvasHeight = ImageCanvas.Height;
+                if (double.IsNaN(canvasWidth) || canvasWidth <= 0) canvasWidth = 800;
+                if (double.IsNaN(canvasHeight) || canvasHeight <= 0) canvasHeight = 600;
+
+                // ベース画像より大きい場合は縦横比を維持してキャンバスの80%以内に縮小
+                double maxAllowedW = canvasWidth * 0.8;
+                double maxAllowedH = canvasHeight * 0.8;
+                if (imgWidth > maxAllowedW || imgHeight > maxAllowedH)
+                {
+                    double scale = Math.Min(maxAllowedW / imgWidth, maxAllowedH / imgHeight);
+                    imgWidth = Math.Round(imgWidth * scale);
+                    imgHeight = Math.Round(imgHeight * scale);
+                }
+
+                // 配置位置の計算（ドロップ位置、または中央）
+                double left, top;
+                if (dropPosition.HasValue)
+                {
+                    left = dropPosition.Value.X - imgWidth / 2.0;
+                    top = dropPosition.Value.Y - imgHeight / 2.0;
+                }
+                else
+                {
+                    left = (canvasWidth - imgWidth) / 2.0;
+                    top = (canvasHeight - imgHeight) / 2.0;
+                }
+
+                // キャンバス内に収まるようクランプ
+                left = Math.Clamp(left, 0, Math.Max(0, canvasWidth - imgWidth));
+                top = Math.Clamp(top, 0, Math.Max(0, canvasHeight - imgHeight));
+
+                var imageControl = new Image
+                {
+                    Source = bitmap,
+                    Stretch = Stretch.Fill,
+                    Focusable = false
+                };
+                RenderOptions.SetBitmapScalingMode(imageControl, BitmapScalingMode.HighQuality);
+
+                var item = new EditableItem
+                {
+                    Width = imgWidth,
+                    Height = imgHeight,
+                    ItemContent = imageControl
+                };
+
+                Canvas.SetLeft(item, left);
+                Canvas.SetTop(item, top);
+
+                item.Selected += (s, e) => SelectItem(item);
+                item.TransformCompleted += (s, e) => _undoManager.Record(new TransformObjectAction(item, e.Before, e.After, SelectItem));
+
+                ImageCanvas.Children.Add(item);
+                _undoManager.Record(new AddObjectAction(ImageCanvas, item, SelectItem));
+
+                SelectItem(item);
+                SetCurrentTool(ToolType.Select);
+
+                StatusInfoText.Text = $"画像を挿入しました ({bitmap.PixelWidth} × {bitmap.PixelHeight} px)";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"画像の挿入に失敗しました。\n\n詳細: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void ExecuteSaveCommand(object sender, ExecutedRoutedEventArgs e)
         {
             string initialDir = !string.IsNullOrEmpty(_currentLoadedFilePath)
@@ -404,7 +518,8 @@ namespace EasyPhotoEditer
                         }
                         else
                         {
-                            // TODO: 画像を編集中の画像に合成する機能の実装
+                            Point dropPoint = e.GetPosition(ImageCanvas);
+                            InsertImageFromFile(filePath, dropPoint);
                         }
                     }
                     else
@@ -1009,6 +1124,14 @@ namespace EasyPhotoEditer
                         SelectColorInComboBox(sb);
                     }
                     SelectThicknessInComboBox(path.StrokeThickness);
+                }
+                else if (item.ItemContent is Image)
+                {
+                    // 合成画像選択時: フォントや図形描画設定はすべて無効化
+                    CbFontFamily.IsEnabled = false;
+                    CbFontSize.IsEnabled = false;
+                    CbStrokeColor.IsEnabled = false;
+                    CbStrokeThickness.IsEnabled = false;
                 }
             }
             finally

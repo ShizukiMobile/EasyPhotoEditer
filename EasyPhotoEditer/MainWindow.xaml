@@ -246,6 +246,8 @@
                 <MenuItem Header="元に戻す(_U)" InputGestureText="Ctrl+Z" Command="ApplicationCommands.Undo" />
                 <MenuItem Header="やり直す(_R)" InputGestureText="Ctrl+Y" Command="ApplicationCommands.Redo" />
                 <Separator />
+                <MenuItem Header="画像の挿入(_I)..." Command="{x:Static local:MainWindow.InsertImageCommand}" />
+                <Separator />
                 <MenuItem x:Name="MenuToolSelect" Header="選択ツール(_S)" IsCheckable="True" IsChecked="True" Click="ToolItem_Click" Tag="Select" />
                 <Separator />
                 <MenuItem x:Name="MenuToolTextBox" Header="テキストボックス(_T)" IsCheckable="True" Click="ToolItem_Click" Tag="TextBox" />
@@ -385,6 +387,23 @@
                               Data="M 3,11 L 8,16 L 19,4" />
                     </Viewbox>
                 </RadioButton>
+
+                <Rectangle Width="1" Height="20" Fill="#3F3F46" Margin="6,0" VerticalAlignment="Center" />
+
+                <!-- 画像の挿入 -->
+                <Button Style="{StaticResource ToolbarButtonStyle}"
+                        Command="{x:Static local:MainWindow.InsertImageCommand}"
+                        ToolTip="画像の挿入...">
+                    <Viewbox Width="17" Height="17">
+                        <Canvas Width="24" Height="24">
+                            <Rectangle Canvas.Left="2" Canvas.Top="2" Width="20" Height="20" RadiusX="2" RadiusY="2"
+                                       Stroke="#E0E0E0" StrokeThickness="1.8" Fill="Transparent" />
+                            <Ellipse Canvas.Left="6" Canvas.Top="6" Width="3.5" Height="3.5" Fill="#E0E0E0" />
+                            <Path Fill="#E0E0E0"
+                                  Data="M 3.5,19 L 9,12 L 13.5,17 L 16.5,13.5 L 20.5,19 Z" />
+                        </Canvas>
+                    </Viewbox>
+                </Button>
 
                 <Rectangle Width="1" Height="20" Fill="#3F3F46" Margin="8,0" VerticalAlignment="Center" />
 
