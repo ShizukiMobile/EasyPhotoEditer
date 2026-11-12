@@ -218,10 +218,176 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- ダークテーマ ContextMenu 内の Separator スタイル -->
+        <Style x:Key="DarkMenuSeparator" TargetType="Separator">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Margin" Value="4,3" />
+            <Setter Property="Background" Value="#3F3F46" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Rectangle Height="1" Fill="#3F3F46" Margin="4,2" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ダークテーマ ContextMenuItem スタイル -->
+        <Style x:Key="DarkContextMenuItem" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="#E0E0E0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="ItemContainerStyle" Value="{Binding RelativeSource={RelativeSource Self}}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="bd"
+                                Background="Transparent"
+                                BorderThickness="1"
+                                BorderBrush="Transparent"
+                                CornerRadius="3"
+                                Margin="2,1"
+                                Padding="8,5">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="20" SharedSizeGroup="CheckCol" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="GestureCol" />
+                                    <ColumnDefinition Width="16" SharedSizeGroup="ArrowCol" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- チェックマーク表示部 -->
+                                <Path x:Name="CheckMark"
+                                      Grid.Column="0"
+                                      Data="M 1,5 L 5,9 L 12,2"
+                                      Stroke="#0078D7"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"
+                                      Visibility="Collapsed" />
+
+                                <!-- テキスト本体 -->
+                                <ContentPresenter Grid.Column="1"
+                                                  ContentSource="Header"
+                                                  RecognizesAccessKey="True"
+                                                  VerticalAlignment="Center" />
+
+                                <!-- ショートカットキー文字列 (Ctrl+D等) -->
+                                <TextBlock Grid.Column="2"
+                                           Text="{TemplateBinding InputGestureText}"
+                                           Foreground="#888888"
+                                           Margin="20,0,4,0"
+                                           VerticalAlignment="Center" />
+
+                                <!-- サブメニュー展開矢印 (▶) -->
+                                <Path x:Name="SubmenuArrow"
+                                      Grid.Column="3"
+                                      Data="M 0,0 L 4,4 L 0,8 Z"
+                                      Fill="#AAAAAA"
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Center"
+                                      Visibility="Collapsed" />
+
+                                <!-- サブメニューポップアップ -->
+                                <Popup x:Name="PART_Popup"
+                                       AllowsTransparency="True"
+                                       Placement="Right"
+                                       IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                       Focusable="False"
+                                       PopupAnimation="Fade">
+                                    <Border Background="#252526"
+                                            BorderBrush="#3F3F46"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            Padding="2"
+                                            Margin="2,0,0,0">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.5" Color="Black" />
+                                        </Border.Effect>
+                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Role" Value="SubmenuHeader">
+                                <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#3E3E42" />
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#555555" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ダークテーマ ContextMenu 専用スタイル -->
+        <Style x:Key="DarkContextMenu" TargetType="ContextMenu">
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="OverridesDefaultStyle" Value="True" />
+            <Setter Property="Grid.IsSharedSizeScope" Value="True" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkContextMenuItem}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="#252526"
+                                BorderBrush="#3F3F46"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="2">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.5" Color="Black" />
+                            </Border.Effect>
+                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- キャンバス空白部用 ContextMenu -->
+        <ContextMenu x:Key="CanvasContextMenu" Style="{StaticResource DarkContextMenu}">
+            <MenuItem Header="テキストボックス(_T)" Click="CtxCanvasInsert_Click" Tag="TextBox" />
+            <MenuItem Header="丸（円）(_C)" Click="CtxCanvasInsert_Click" Tag="Circle" />
+            <MenuItem Header="四角形(_R)" Click="CtxCanvasInsert_Click" Tag="Rectangle" />
+            <MenuItem Header="角丸四角形(_U)" Click="CtxCanvasInsert_Click" Tag="RoundedRectangle" />
+            <MenuItem Header="チェックマーク(_M)" Click="CtxCanvasInsert_Click" Tag="Checkmark" />
+            <Separator Style="{StaticResource DarkMenuSeparator}" />
+            <MenuItem Header="画像の挿入(_I)..." Click="CtxCanvasInsertImage_Click" />
+        </ContextMenu>
+
+        <!-- オブジェクト用 ContextMenu -->
+        <ContextMenu x:Key="ObjectContextMenu" Style="{StaticResource DarkContextMenu}">
+            <MenuItem x:Name="CtxCropMenu" Header="図形に合わせてトリミング(_C)" ItemContainerStyle="{StaticResource DarkContextMenuItem}">
+                <MenuItem x:Name="CtxCropRoundedRect" Header="角丸四角(_R)" Click="CtxCrop_Click" Tag="RoundedRectangle" />
+                <MenuItem x:Name="CtxCropCircle" Header="丸(_C)" Click="CtxCrop_Click" Tag="Circle" />
+                <MenuItem x:Name="CtxCropNone" Header="なし(_N)" Click="CtxCrop_Click" Tag="None" />
+            </MenuItem>
+            <Separator x:Name="CtxCropSeparator" Style="{StaticResource DarkMenuSeparator}" />
+            <MenuItem Header="複製(_D)" InputGestureText="Ctrl+D" Click="CtxDuplicate_Click" />
+            <Separator Style="{StaticResource DarkMenuSeparator}" />
+            <MenuItem Header="前面に移動(_F)" Click="CtxBringForward_Click" />
+            <MenuItem Header="背面に移動(_B)" Click="CtxSendBackward_Click" />
+            <Separator Style="{StaticResource DarkMenuSeparator}" />
+            <MenuItem Header="削除(_X)" InputGestureText="Delete" Click="MenuDelete_Click" />
+        </ContextMenu>
     </Window.Resources>
     <Window.InputBindings>
         <KeyBinding Key="O" Modifiers="Control" Command="{x:Static local:MainWindow.OpenCommand}" />
         <KeyBinding Key="S" Modifiers="Control" Command="{x:Static local:MainWindow.SaveCommand}" />
+        <KeyBinding Key="D" Modifiers="Control" Command="{x:Static local:MainWindow.DuplicateCommand}" />
         <KeyBinding Key="Z" Modifiers="Control" Command="ApplicationCommands.Undo" />
         <KeyBinding Key="Y" Modifiers="Control" Command="ApplicationCommands.Redo" />
         <KeyBinding Key="OemPlus" Modifiers="Control" Command="{x:Static local:MainWindow.ZoomInCommand}" />
@@ -534,7 +700,8 @@
                                 ClipToBounds="True"
                                 MouseLeftButtonDown="ImageCanvas_MouseLeftButtonDown"
                                 MouseMove="ImageCanvas_MouseMove"
-                                MouseLeftButtonUp="ImageCanvas_MouseLeftButtonUp">
+                                MouseLeftButtonUp="ImageCanvas_MouseLeftButtonUp"
+                                MouseRightButtonUp="ImageCanvas_MouseRightButtonUp">
                             <Image x:Name="CanvasImage"
                                    Stretch="None"
                                    RenderOptions.BitmapScalingMode="NearestNeighbor" />

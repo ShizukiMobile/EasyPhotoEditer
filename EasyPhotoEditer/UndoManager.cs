@@ -184,4 +184,32 @@ namespace EasyPhotoEditer
         public void Undo() => _applyBefore();
         public void Redo() => _applyAfter();
     }
+
+    public class ZOrderAction : IUndoableAction
+    {
+        private readonly Canvas _canvas;
+        private readonly EditableItem _item;
+        private readonly int _oldIndex;
+        private readonly int _newIndex;
+
+        public ZOrderAction(Canvas canvas, EditableItem item, int oldIndex, int newIndex)
+        {
+            _canvas = canvas;
+            _item = item;
+            _oldIndex = oldIndex;
+            _newIndex = newIndex;
+        }
+
+        public void Undo()
+        {
+            _canvas.Children.Remove(_item);
+            _canvas.Children.Insert(_oldIndex, _item);
+        }
+
+        public void Redo()
+        {
+            _canvas.Children.Remove(_item);
+            _canvas.Children.Insert(_newIndex, _item);
+        }
+    }
 }

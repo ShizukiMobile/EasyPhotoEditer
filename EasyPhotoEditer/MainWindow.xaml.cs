@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
@@ -54,6 +55,7 @@ namespace EasyPhotoEditer
         public static readonly RoutedUICommand OpenCommand = new("開く", "OpenCommand", typeof(MainWindow));
         public static readonly RoutedUICommand SaveCommand = new("編集した画像を保存", "SaveCommand", typeof(MainWindow));
         public static readonly RoutedUICommand InsertImageCommand = new("画像の挿入", "InsertImageCommand", typeof(MainWindow));
+        public static readonly RoutedUICommand DuplicateCommand = new("複製", "DuplicateCommand", typeof(MainWindow));
         public static readonly RoutedUICommand ZoomInCommand = new("ズームイン", "ZoomInCommand", typeof(MainWindow));
         public static readonly RoutedUICommand ZoomOutCommand = new("ズームアウト", "ZoomOutCommand", typeof(MainWindow));
         public static readonly RoutedUICommand ResetZoomCommand = new("100% に戻す", "ResetZoomCommand", typeof(MainWindow));
@@ -106,6 +108,7 @@ namespace EasyPhotoEditer
             CommandBindings.Add(new CommandBinding(OpenCommand, ExecuteOpenCommand));
             CommandBindings.Add(new CommandBinding(SaveCommand, ExecuteSaveCommand, CanExecuteSaveCommand));
             CommandBindings.Add(new CommandBinding(InsertImageCommand, ExecuteInsertImageCommand, CanExecuteInsertImageCommand));
+            CommandBindings.Add(new CommandBinding(DuplicateCommand, (s, e) => DuplicateSelectedItem(), (s, e) => e.CanExecute = _selectedItem != null));
             CommandBindings.Add(new CommandBinding(ZoomInCommand, (s, e) => ZoomRelative(ZoomStepFactor)));
             CommandBindings.Add(new CommandBinding(ZoomOutCommand, (s, e) => ZoomRelative(1.0 / ZoomStepFactor)));
             CommandBindings.Add(new CommandBinding(ResetZoomCommand, (s, e) => SetZoom(1.0)));
@@ -365,6 +368,13 @@ namespace EasyPhotoEditer
 
                 item.Selected += (s, e) => SelectItem(item);
                 item.TransformCompleted += (s, e) => _undoManager.Record(new TransformObjectAction(item, e.Before, e.After, SelectItem));
+                item.SizeChanged += (s, e) =>
+                {
+                    if (item.ItemContent is Image && GetItemClipType(item) != ImageClipType.None)
+                    {
+                        ApplyImageClip(item, GetItemClipType(item));
+                    }
+                };
 
                 ImageCanvas.Children.Add(item);
                 _undoManager.Record(new AddObjectAction(ImageCanvas, item, SelectItem));
@@ -526,6 +536,9 @@ namespace EasyPhotoEditer
                     {
                         LoadImageFromFile(filePath);
                     }
+
+                    Activate();
+                    Focus();
                 }
             }
         }
@@ -1009,6 +1022,7 @@ namespace EasyPhotoEditer
             _selectedItem.IsSelected = true;
 
             UpdateToolbarFromSelectedObject(_selectedItem);
+            CommandManager.InvalidateRequerySuggested();
         }
 
         private void DeselectAll()
@@ -1018,6 +1032,7 @@ namespace EasyPhotoEditer
                 _selectedItem.IsSelected = false;
                 _selectedItem = null;
                 UpdateToolbarFromSelectedObject(null);
+                CommandManager.InvalidateRequerySuggested();
             }
         }
 
@@ -1315,6 +1330,378 @@ namespace EasyPhotoEditer
                     ));
                     path.StrokeThickness = newThick;
                 }
+            }
+        }
+
+        #endregion
+
+        #region 右クリックコンテキストメニュー・トリミング・Zオーダー・複製
+
+        public enum ImageClipType
+        {
+            None,
+            RoundedRectangle,
+            Circle
+        }
+
+        private readonly Dictionary<EditableItem, ImageClipType> _itemClips = new();
+        private Point _lastRightClickCanvasPos;
+
+        private ImageClipType GetItemClipType(EditableItem item)
+        {
+            return _itemClips.TryGetValue(item, out var type) ? type : ImageClipType.None;
+        }
+
+        private void SetItemClipType(EditableItem item, ImageClipType type)
+        {
+            _itemClips[item] = type;
+        }
+
+        private void ApplyImageClip(EditableItem item, ImageClipType clipType)
+        {
+            if (item.ItemContent is not Image img) return;
+
+            if (clipType == ImageClipType.None)
+            {
+                img.Clip = null;
+                return;
+            }
+
+            double totalW = item.ActualWidth > 0 ? item.ActualWidth : item.Width;
+            double totalH = item.ActualHeight > 0 ? item.ActualHeight : item.Height;
+            double w = img.ActualWidth > 0 ? img.ActualWidth : Math.Max(0, totalW - 8.0);
+            double h = img.ActualHeight > 0 ? img.ActualHeight : Math.Max(0, totalH - 8.0);
+
+            if (w <= 0 || h <= 0)
+            {
+                // レイアウト未完了の場合は完了後に再適用
+                Dispatcher.BeginInvoke(() => ApplyImageClip(item, clipType), System.Windows.Threading.DispatcherPriority.Loaded);
+                return;
+            }
+
+            switch (clipType)
+            {
+                case ImageClipType.RoundedRectangle:
+                    double radius = Math.Min(24, Math.Min(w, h) / 4.0);
+                    img.Clip = new RectangleGeometry(new Rect(0, 0, w, h), radius, radius);
+                    break;
+                case ImageClipType.Circle:
+                    img.Clip = new EllipseGeometry(new Point(w / 2.0, h / 2.0), w / 2.0, h / 2.0);
+                    break;
+            }
+        }
+
+        private void ChangeSelectedItemClip(ImageClipType newType)
+        {
+            if (_selectedItem == null || _selectedItem.ItemContent is not Image) return;
+
+            var item = _selectedItem;
+            var oldType = GetItemClipType(item);
+            if (oldType == newType) return;
+
+            _undoManager.Record(new StyleChangeAction(
+                () =>
+                {
+                    SetItemClipType(item, oldType);
+                    ApplyImageClip(item, oldType);
+                },
+                () =>
+                {
+                    SetItemClipType(item, newType);
+                    ApplyImageClip(item, newType);
+                }
+            ));
+
+            SetItemClipType(item, newType);
+            ApplyImageClip(item, newType);
+        }
+
+        private void ImageCanvas_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _lastRightClickCanvasPos = e.GetPosition(ImageCanvas);
+
+            // ヒットテストで EditableItem 上か判定
+            HitTestResult hitResult = VisualTreeHelper.HitTest(ImageCanvas, _lastRightClickCanvasPos);
+            EditableItem? hitItem = FindParentEditableItem(hitResult?.VisualHit);
+
+            if (hitItem != null)
+            {
+                // オブジェクトの上で右クリック
+                SelectItem(hitItem);
+                hitItem.Focus();
+
+                if (TryFindResource("ObjectContextMenu") is ContextMenu objMenu)
+                {
+                    bool isImage = hitItem.ItemContent is Image;
+                    if (objMenu.FindName("CtxCropMenu") is MenuItem cropMenu)
+                    {
+                        cropMenu.Visibility = isImage ? Visibility.Visible : Visibility.Collapsed;
+                    }
+                    if (objMenu.FindName("CtxCropSeparator") is Separator cropSep)
+                    {
+                        cropSep.Visibility = isImage ? Visibility.Visible : Visibility.Collapsed;
+                    }
+
+                    if (isImage)
+                    {
+                        var cropType = GetItemClipType(hitItem);
+                        if (objMenu.FindName("CtxCropRoundedRect") is MenuItem rRect) rRect.IsChecked = cropType == ImageClipType.RoundedRectangle;
+                        if (objMenu.FindName("CtxCropCircle") is MenuItem circle) circle.IsChecked = cropType == ImageClipType.Circle;
+                        if (objMenu.FindName("CtxCropNone") is MenuItem none) none.IsChecked = cropType == ImageClipType.None;
+                    }
+
+                    objMenu.PlacementTarget = ImageCanvas;
+                    objMenu.Placement = PlacementMode.MousePoint;
+                    objMenu.IsOpen = true;
+                }
+            }
+            else
+            {
+                // 空白キャンバス上で右クリック
+                DeselectAll();
+
+                if (TryFindResource("CanvasContextMenu") is ContextMenu canvasMenu)
+                {
+                    canvasMenu.PlacementTarget = ImageCanvas;
+                    canvasMenu.Placement = PlacementMode.MousePoint;
+                    canvasMenu.IsOpen = true;
+                }
+            }
+
+            e.Handled = true;
+        }
+
+        private static EditableItem? FindParentEditableItem(DependencyObject? element)
+        {
+            while (element != null && element is not EditableItem && element is not Canvas)
+            {
+                element = VisualTreeHelper.GetParent(element);
+            }
+            return element as EditableItem;
+        }
+
+        private void CtxCanvasInsert_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem mi && mi.Tag is string tagStr && Enum.TryParse<ToolType>(tagStr, out var toolType))
+            {
+                if (_settings.RightClickBehavior == RightClickInsertBehavior.ClickToInsert)
+                {
+                    double w = 120, h = 80;
+                    switch (toolType)
+                    {
+                        case ToolType.TextBox:
+                            w = 160; h = 50;
+                            break;
+                        case ToolType.Circle:
+                            w = 80; h = 80;
+                            break;
+                        case ToolType.Rectangle:
+                            w = 120; h = 80;
+                            break;
+                        case ToolType.RoundedRectangle:
+                            w = 120; h = 80;
+                            break;
+                        case ToolType.Checkmark:
+                            w = 48; h = 48;
+                            break;
+                    }
+
+                    double left = Math.Clamp(_lastRightClickCanvasPos.X - w / 2.0, 0, Math.Max(0, ImageCanvas.Width - w));
+                    double top = Math.Clamp(_lastRightClickCanvasPos.Y - h / 2.0, 0, Math.Max(0, ImageCanvas.Height - h));
+
+                    CreateAndInsertObject(toolType, left, top, w, h);
+                    SetCurrentTool(ToolType.Select);
+                }
+                else
+                {
+                    SetCurrentTool(toolType);
+                }
+            }
+        }
+
+        private void CtxCanvasInsertImage_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "挿入する画像を選択",
+                Filter = "画像ファイル (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|すべてのファイル (*.*)|*.*",
+                FilterIndex = 1,
+                Multiselect = false
+            };
+
+            if (dialog.ShowDialog(this) == true)
+            {
+                InsertImageFromFile(dialog.FileName, _lastRightClickCanvasPos);
+            }
+        }
+
+        private void CtxBringForward_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedItem == null) return;
+            int idx = ImageCanvas.Children.IndexOf(_selectedItem);
+            if (idx < 0 || idx >= ImageCanvas.Children.Count - 1) return;
+
+            int newIdx = idx + 1;
+            ImageCanvas.Children.RemoveAt(idx);
+            ImageCanvas.Children.Insert(newIdx, _selectedItem);
+            _undoManager.Record(new ZOrderAction(ImageCanvas, _selectedItem, idx, newIdx));
+        }
+
+        private void CtxSendBackward_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedItem == null) return;
+            int idx = ImageCanvas.Children.IndexOf(_selectedItem);
+            if (idx <= 2) return; // CanvasImage(0), RubberBand(1) を下回らない
+
+            int newIdx = idx - 1;
+            ImageCanvas.Children.RemoveAt(idx);
+            ImageCanvas.Children.Insert(newIdx, _selectedItem);
+            _undoManager.Record(new ZOrderAction(ImageCanvas, _selectedItem, idx, newIdx));
+        }
+
+        private void CtxCrop_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem mi && mi.Tag is string tagStr && Enum.TryParse<ImageClipType>(tagStr, out var type))
+            {
+                ChangeSelectedItemClip(type);
+            }
+        }
+
+        private void CtxDuplicate_Click(object sender, RoutedEventArgs e)
+        {
+            DuplicateSelectedItem();
+        }
+
+        private void DuplicateSelectedItem()
+        {
+            if (_selectedItem == null) return;
+
+            double curLeft = Canvas.GetLeft(_selectedItem);
+            double curTop = Canvas.GetTop(_selectedItem);
+            if (double.IsNaN(curLeft)) curLeft = 0;
+            if (double.IsNaN(curTop)) curTop = 0;
+
+            double w = _selectedItem.ActualWidth > 0 ? _selectedItem.ActualWidth : _selectedItem.Width;
+            double h = _selectedItem.ActualHeight > 0 ? _selectedItem.ActualHeight : _selectedItem.Height;
+
+            double newLeft = Math.Clamp(curLeft + 20, 0, Math.Max(0, ImageCanvas.Width - w));
+            double newTop = Math.Clamp(curTop + 20, 0, Math.Max(0, ImageCanvas.Height - h));
+
+            var newItem = new EditableItem
+            {
+                Width = w,
+                Height = h
+            };
+            Canvas.SetLeft(newItem, newLeft);
+            Canvas.SetTop(newItem, newTop);
+
+            TextBox? newTextBox = null;
+
+            if (_selectedItem.ItemContent is TextBox srcTb)
+            {
+                newItem.IsTextBox = true;
+                newTextBox = new TextBox
+                {
+                    Text = srcTb.Text,
+                    Foreground = srcTb.Foreground,
+                    Background = srcTb.Background,
+                    BorderBrush = srcTb.BorderBrush,
+                    BorderThickness = srcTb.BorderThickness,
+                    FontSize = srcTb.FontSize,
+                    FontFamily = srcTb.FontFamily,
+                    AcceptsReturn = srcTb.AcceptsReturn,
+                    TextWrapping = srcTb.TextWrapping,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                };
+
+                string textBefore = newTextBox.Text;
+                newTextBox.GotFocus += (s, e) => textBefore = newTextBox.Text;
+                newTextBox.LostFocus += (s, e) =>
+                {
+                    if (newTextBox.Text != textBefore)
+                    {
+                        _undoManager.Record(new TextChangedAction(newTextBox, textBefore, newTextBox.Text));
+                        textBefore = newTextBox.Text;
+                    }
+                };
+
+                newItem.ItemContent = newTextBox;
+            }
+            else if (_selectedItem.ItemContent is Ellipse srcEllipse)
+            {
+                newItem.ItemContent = new Ellipse
+                {
+                    Stroke = srcEllipse.Stroke,
+                    StrokeThickness = srcEllipse.StrokeThickness,
+                    Fill = srcEllipse.Fill
+                };
+            }
+            else if (_selectedItem.ItemContent is System.Windows.Shapes.Rectangle srcRect)
+            {
+                newItem.ItemContent = new System.Windows.Shapes.Rectangle
+                {
+                    Stroke = srcRect.Stroke,
+                    StrokeThickness = srcRect.StrokeThickness,
+                    Fill = srcRect.Fill,
+                    RadiusX = srcRect.RadiusX,
+                    RadiusY = srcRect.RadiusY
+                };
+            }
+            else if (_selectedItem.ItemContent is Viewbox srcVb && srcVb.Child is WpfPath srcPath)
+            {
+                var newPath = new WpfPath
+                {
+                    Data = srcPath.Data.Clone(),
+                    Stroke = srcPath.Stroke,
+                    StrokeThickness = srcPath.StrokeThickness,
+                    StrokeStartLineCap = srcPath.StrokeStartLineCap,
+                    StrokeEndLineCap = srcPath.StrokeEndLineCap,
+                    StrokeLineJoin = srcPath.StrokeLineJoin
+                };
+                newItem.ItemContent = new Viewbox
+                {
+                    Stretch = Stretch.Uniform,
+                    Child = newPath
+                };
+            }
+            else if (_selectedItem.ItemContent is Image srcImg)
+            {
+                var newImg = new Image
+                {
+                    Source = srcImg.Source,
+                    Stretch = Stretch.Fill,
+                    Focusable = false
+                };
+                RenderOptions.SetBitmapScalingMode(newImg, BitmapScalingMode.HighQuality);
+                newItem.ItemContent = newImg;
+
+                var clipType = GetItemClipType(_selectedItem);
+                SetItemClipType(newItem, clipType);
+                ApplyImageClip(newItem, clipType);
+            }
+
+            newItem.Selected += (s, e) => SelectItem(newItem);
+            newItem.TransformCompleted += (s, e) => _undoManager.Record(new TransformObjectAction(newItem, e.Before, e.After, SelectItem));
+            newItem.SizeChanged += (s, e) =>
+            {
+                if (newItem.ItemContent is Image && GetItemClipType(newItem) != ImageClipType.None)
+                {
+                    ApplyImageClip(newItem, GetItemClipType(newItem));
+                }
+            };
+
+            ImageCanvas.Children.Add(newItem);
+            _undoManager.Record(new AddObjectAction(ImageCanvas, newItem, SelectItem));
+
+            SelectItem(newItem);
+
+            if (newTextBox != null)
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    newTextBox.Focus();
+                    newTextBox.SelectAll();
+                }, System.Windows.Threading.DispatcherPriority.Input);
             }
         }
 
