@@ -52,6 +52,7 @@ namespace EasyPhotoEditer
     public partial class MainWindow : Window
     {
         public static readonly RoutedUICommand OpenCommand = new("開く", "OpenCommand", typeof(MainWindow));
+        public static readonly RoutedUICommand SaveCommand = new("編集した画像を保存", "SaveCommand", typeof(MainWindow));
         public static readonly RoutedUICommand ZoomInCommand = new("ズームイン", "ZoomInCommand", typeof(MainWindow));
         public static readonly RoutedUICommand ZoomOutCommand = new("ズームアウト", "ZoomOutCommand", typeof(MainWindow));
         public static readonly RoutedUICommand ResetZoomCommand = new("100% に戻す", "ResetZoomCommand", typeof(MainWindow));
@@ -64,6 +65,7 @@ namespace EasyPhotoEditer
 
         private double _currentZoom = 1.0;
         private readonly string? _initialFilePath;
+        private string? _currentLoadedFilePath;
 
         // 設定管理
         private AppSettings _settings;
@@ -77,14 +79,8 @@ namespace EasyPhotoEditer
         private bool _isDrawing;
         private Point _drawStartPoint;
 
-        // デフォルトスタイルおよび選択連動フラグ
+        // ツールバー選択連動フラグ
         private bool _isUpdatingToolbarFromSelection;
-        private FontFamily _defaultFontFamily = new("Yu Gothic UI");
-        private double _defaultFontSize = 18.0;
-        private SolidColorBrush _defaultTextColorBrush = Brushes.Red;
-        private SolidColorBrush _defaultShapeColorBrush = Brushes.Red;
-        private SolidColorBrush _defaultBrush = Brushes.Red;
-        private double _defaultStrokeThickness = 3.0;
 
         public MainWindow() : this(null)
         {
@@ -107,6 +103,7 @@ namespace EasyPhotoEditer
         private void RegisterCommands()
         {
             CommandBindings.Add(new CommandBinding(OpenCommand, ExecuteOpenCommand));
+            CommandBindings.Add(new CommandBinding(SaveCommand, ExecuteSaveCommand, CanExecuteSaveCommand));
             CommandBindings.Add(new CommandBinding(ZoomInCommand, (s, e) => ZoomRelative(ZoomStepFactor)));
             CommandBindings.Add(new CommandBinding(ZoomOutCommand, (s, e) => ZoomRelative(1.0 / ZoomStepFactor)));
             CommandBindings.Add(new CommandBinding(ResetZoomCommand, (s, e) => SetZoom(1.0)));
@@ -180,41 +177,32 @@ namespace EasyPhotoEditer
 
         private void ApplySettingsToState()
         {
-            _isUpdatingToolbarFromSelection = true;
-            try
+            UpdateToolbarFromSelectedObject(_selectedItem);
+        }
+
+        private FontFamily GetDefaultFontFamily()
+        {
+            if (CbFontFamily.ItemsSource is List<FontItem> fontItems)
             {
-                // フォント設定の反映
-                if (CbFontFamily.ItemsSource is List<FontItem> fontItems)
+                var match = fontItems.FirstOrDefault(f => f.DisplayName == _settings.DefaultFontFamily || f.FontFamily.Source == _settings.DefaultFontFamily)
+                            ?? fontItems.FirstOrDefault(f => f.DisplayName is "メイリオ" or "Yu Gothic UI")
+                            ?? fontItems.FirstOrDefault();
+                if (match != null)
                 {
-                    var match = fontItems.FirstOrDefault(f => f.DisplayName == _settings.DefaultFontFamily || f.FontFamily.Source == _settings.DefaultFontFamily)
-                                ?? fontItems.FirstOrDefault(f => f.DisplayName is "メイリオ" or "Yu Gothic UI")
-                                ?? fontItems.FirstOrDefault();
-                    if (match != null)
-                    {
-                        CbFontFamily.SelectedItem = match;
-                        _defaultFontFamily = match.FontFamily;
-                    }
+                    return match.FontFamily;
                 }
-
-                // 文字サイズ設定の反映
-                _defaultFontSize = _settings.DefaultFontSize;
-                CbFontSize.Text = _defaultFontSize.ToString("0");
-                CbFontSize.SelectedItem = _defaultFontSize;
-
-                // 文字色・図形色設定の反映
-                _defaultTextColorBrush = FindColorBrushByName(_settings.DefaultTextColor) ?? Brushes.Red;
-                _defaultShapeColorBrush = FindColorBrushByName(_settings.DefaultShapeColor) ?? Brushes.Red;
-                _defaultBrush = _defaultShapeColorBrush;
-                SelectColorInComboBox(_defaultBrush);
-
-                // 線の太さ設定の反映
-                _defaultStrokeThickness = _settings.DefaultStrokeThickness;
-                SelectThicknessInComboBox(_defaultStrokeThickness);
             }
-            finally
-            {
-                _isUpdatingToolbarFromSelection = false;
-            }
+            return new FontFamily("Yu Gothic UI");
+        }
+
+        private SolidColorBrush GetDefaultTextColorBrush()
+        {
+            return FindColorBrushByName(_settings.DefaultTextColor) ?? Brushes.Red;
+        }
+
+        private SolidColorBrush GetDefaultShapeColorBrush()
+        {
+            return FindColorBrushByName(_settings.DefaultShapeColor) ?? Brushes.Red;
         }
 
         private SolidColorBrush? FindColorBrushByName(string name)
@@ -261,6 +249,115 @@ namespace EasyPhotoEditer
             if (dialog.ShowDialog(this) == true)
             {
                 LoadImageFromFile(dialog.FileName);
+            }
+        }
+
+        private void CanExecuteSaveCommand(object sender, CanExecuteRoutedEventArgs e)
+        {
+            e.CanExecute = CanvasContainer != null && CanvasContainer.Visibility == Visibility.Visible;
+        }
+
+        private void ExecuteSaveCommand(object sender, ExecutedRoutedEventArgs e)
+        {
+            string initialDir = !string.IsNullOrEmpty(_currentLoadedFilePath)
+                ? Path.GetDirectoryName(_currentLoadedFilePath) ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)
+                : Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+
+            string initialFileName = !string.IsNullOrEmpty(_currentLoadedFilePath)
+                ? Path.GetFileNameWithoutExtension(_currentLoadedFilePath) + "_edited.png"
+                : "edited_image.png";
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "編集した画像を保存",
+                Filter = "PNG画像 (*.png)|*.png",
+                DefaultExt = "png",
+                InitialDirectory = initialDir,
+                FileName = initialFileName
+            };
+
+            if (dialog.ShowDialog(this) == true)
+            {
+                SaveCanvasToPng(dialog.FileName);
+            }
+        }
+
+        private void SaveCanvasToPng(string filePath)
+        {
+            try
+            {
+                int pixelWidth = (int)Math.Round(ImageCanvas.Width);
+                int pixelHeight = (int)Math.Round(ImageCanvas.Height);
+
+                if (pixelWidth <= 0 || pixelHeight <= 0)
+                {
+                    MessageBox.Show(this, "保存対象の画像サイズが無効です。", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                // 1. レンダリング時の映り込みを防ぐため、選択枠とラバーバンドを一時退避
+                var previouslySelectedItem = _selectedItem;
+                if (_selectedItem != null)
+                {
+                    _selectedItem.IsSelected = false;
+                }
+                var previousRubberBandVisibility = RubberBand.Visibility;
+                RubberBand.Visibility = Visibility.Collapsed;
+
+                ImageCanvas.UpdateLayout();
+
+                RenderTargetBitmap rtb;
+                try
+                {
+                    // 2. 96 DPI・元画像ピクセル解像度固定で DrawingVisual を使用してレンダリング
+                    // VisualBrush を使用することで、ImageCanvas の親の LayoutTransform (ズーム) や
+                    // システムの DPI スケーリング設定に一切左右されず、(0, 0, pixelWidth, pixelHeight) の等倍矩形として描画される
+                    var drawingVisual = new DrawingVisual();
+                    using (var dc = drawingVisual.RenderOpen())
+                    {
+                        var visualBrush = new VisualBrush(ImageCanvas)
+                        {
+                            Stretch = Stretch.None,
+                            Viewbox = new Rect(0, 0, pixelWidth, pixelHeight),
+                            ViewboxUnits = BrushMappingMode.Absolute,
+                            Viewport = new Rect(0, 0, pixelWidth, pixelHeight),
+                            ViewportUnits = BrushMappingMode.Absolute
+                        };
+                        dc.DrawRectangle(visualBrush, null, new Rect(0, 0, pixelWidth, pixelHeight));
+                    }
+
+                    rtb = new RenderTargetBitmap(pixelWidth, pixelHeight, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(drawingVisual);
+                }
+                finally
+                {
+                    // 3. 選択状態およびラバーバンドの表示を復元
+                    if (previouslySelectedItem != null)
+                    {
+                        previouslySelectedItem.IsSelected = true;
+                    }
+                    RubberBand.Visibility = previousRubberBandVisibility;
+                }
+
+                // 4. PNGエンコーダーで書き出し
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(rtb));
+
+                using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    encoder.Save(stream);
+                }
+
+                _currentLoadedFilePath = filePath;
+                CommandManager.InvalidateRequerySuggested();
+
+                string fileName = Path.GetFileName(filePath);
+                StatusInfoText.Text = $"画像を保存しました: {filePath}";
+                Title = $"{fileName} ({pixelWidth} × {pixelHeight} px) - EasyPhotoEditer";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"画像の保存に失敗しました。\n\n詳細: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -355,6 +452,9 @@ namespace EasyPhotoEditer
                 SetZoom(1.0);
                 SetCurrentTool(ToolType.Select);
                 UpdateToolbarFromSelectedObject(null);
+
+                _currentLoadedFilePath = filePath;
+                CommandManager.InvalidateRequerySuggested();
 
                 string fileName = Path.GetFileName(filePath);
                 Title = $"{fileName} ({pixelWidth} × {pixelHeight} px) - EasyPhotoEditer";
@@ -648,16 +748,17 @@ namespace EasyPhotoEditer
             {
                 case ToolType.TextBox:
                     item.IsTextBox = true;
-                    var textColor = _defaultBrush != _defaultShapeColorBrush ? _defaultBrush : _defaultTextColorBrush;
+                    var textFont = GetDefaultFontFamily();
+                    var textColor = GetDefaultTextColorBrush();
                     textControl = new TextBox
                     {
                         Text = "テキストを入力",
                         Foreground = textColor,
                         Background = Brushes.Transparent,
                         BorderBrush = textColor,
-                        BorderThickness = new Thickness(_defaultStrokeThickness),
-                        FontSize = _defaultFontSize,
-                        FontFamily = _defaultFontFamily,
+                        BorderThickness = new Thickness(_settings.DefaultStrokeThickness),
+                        FontSize = _settings.DefaultFontSize,
+                        FontFamily = textFont,
                         AcceptsReturn = true,
                         TextWrapping = TextWrapping.Wrap,
                         VerticalScrollBarVisibility = ScrollBarVisibility.Auto
@@ -680,8 +781,8 @@ namespace EasyPhotoEditer
                 case ToolType.Circle:
                     item.ItemContent = new Ellipse
                     {
-                        Stroke = _defaultBrush,
-                        StrokeThickness = _defaultStrokeThickness,
+                        Stroke = GetDefaultShapeColorBrush(),
+                        StrokeThickness = _settings.DefaultStrokeThickness,
                         Fill = Brushes.Transparent
                     };
                     break;
@@ -689,8 +790,8 @@ namespace EasyPhotoEditer
                 case ToolType.Rectangle:
                     item.ItemContent = new System.Windows.Shapes.Rectangle
                     {
-                        Stroke = _defaultBrush,
-                        StrokeThickness = _defaultStrokeThickness,
+                        Stroke = GetDefaultShapeColorBrush(),
+                        StrokeThickness = _settings.DefaultStrokeThickness,
                         Fill = Brushes.Transparent
                     };
                     break;
@@ -698,8 +799,8 @@ namespace EasyPhotoEditer
                 case ToolType.RoundedRectangle:
                     item.ItemContent = new System.Windows.Shapes.Rectangle
                     {
-                        Stroke = _defaultBrush,
-                        StrokeThickness = _defaultStrokeThickness,
+                        Stroke = GetDefaultShapeColorBrush(),
+                        StrokeThickness = _settings.DefaultStrokeThickness,
                         Fill = Brushes.Transparent,
                         RadiusX = 16,
                         RadiusY = 16
@@ -710,8 +811,8 @@ namespace EasyPhotoEditer
                     var path = new WpfPath
                     {
                         Data = Geometry.Parse("M 4,22 L 15,33 L 38,8"),
-                        Stroke = _defaultBrush,
-                        StrokeThickness = _defaultStrokeThickness,
+                        Stroke = GetDefaultShapeColorBrush(),
+                        StrokeThickness = _settings.DefaultStrokeThickness,
                         StrokeStartLineCap = PenLineCap.Round,
                         StrokeEndLineCap = PenLineCap.Round,
                         StrokeLineJoin = PenLineJoin.Round
@@ -826,21 +927,23 @@ namespace EasyPhotoEditer
             {
                 if (item == null)
                 {
-                    // 未選択時: フォント・サイズは無効化、色と太さはデフォルト値を表示
+                    // 図形未選択時: すべて無効化（操作不可）
                     CbFontFamily.IsEnabled = false;
                     CbFontSize.IsEnabled = false;
-                    CbStrokeColor.IsEnabled = true;
-                    CbStrokeThickness.IsEnabled = true;
+                    CbStrokeColor.IsEnabled = false;
+                    CbStrokeThickness.IsEnabled = false;
 
-                    SelectFontInComboBox(_defaultFontFamily);
-                    CbFontSize.Text = _defaultFontSize.ToString("0");
-                    SelectColorInComboBox(_defaultBrush);
-                    SelectThicknessInComboBox(_defaultStrokeThickness);
+                    // 表示はオプション設定の既定値
+                    SelectFontInComboBox(GetDefaultFontFamily());
+                    CbFontSize.Text = _settings.DefaultFontSize.ToString("0");
+                    SelectColorInComboBox(GetDefaultShapeColorBrush());
+                    SelectThicknessInComboBox(_settings.DefaultStrokeThickness);
                     return;
                 }
 
                 if (item.ItemContent is TextBox tb)
                 {
+                    // テキストボックス選択時: すべて有効
                     CbFontFamily.IsEnabled = true;
                     CbFontSize.IsEnabled = true;
                     CbStrokeColor.IsEnabled = true;
@@ -856,6 +959,7 @@ namespace EasyPhotoEditer
                 }
                 else if (item.ItemContent is Shape shape)
                 {
+                    // 通常図形選択時: 色と太さのみ有効
                     CbFontFamily.IsEnabled = false;
                     CbFontSize.IsEnabled = false;
                     CbStrokeColor.IsEnabled = true;
@@ -869,6 +973,7 @@ namespace EasyPhotoEditer
                 }
                 else if (item.ItemContent is Viewbox vb && vb.Child is WpfPath path)
                 {
+                    // チェックマーク選択時: 色と太さのみ有効
                     CbFontFamily.IsEnabled = false;
                     CbFontSize.IsEnabled = false;
                     CbStrokeColor.IsEnabled = true;
@@ -927,11 +1032,9 @@ namespace EasyPhotoEditer
         {
             if (_isUpdatingToolbarFromSelection) return;
 
-            if (CbFontFamily.SelectedItem is FontItem fi)
+            if (_selectedItem?.ItemContent is TextBox tb && CbFontFamily.SelectedItem is FontItem fi)
             {
-                _defaultFontFamily = fi.FontFamily;
-
-                if (_selectedItem?.ItemContent is TextBox tb && tb.FontFamily.Source != fi.FontFamily.Source)
+                if (tb.FontFamily.Source != fi.FontFamily.Source)
                 {
                     var oldFont = tb.FontFamily;
                     var newFont = fi.FontFamily;
@@ -975,8 +1078,6 @@ namespace EasyPhotoEditer
 
         private void ApplyFontSize(double size)
         {
-            _defaultFontSize = size;
-
             if (_selectedItem?.ItemContent is TextBox tb && Math.Abs(tb.FontSize - size) > 0.1)
             {
                 var oldSize = tb.FontSize;
@@ -993,44 +1094,39 @@ namespace EasyPhotoEditer
         {
             if (_isUpdatingToolbarFromSelection) return;
 
-            if (CbStrokeColor.SelectedItem is ColorItem ci)
+            if (_selectedItem != null && CbStrokeColor.SelectedItem is ColorItem ci)
             {
-                _defaultBrush = ci.Brush;
-
-                if (_selectedItem != null)
+                if (_selectedItem.ItemContent is TextBox tb)
                 {
-                    if (_selectedItem.ItemContent is TextBox tb)
-                    {
-                        var oldFg = tb.Foreground;
-                        var oldBc = tb.BorderBrush;
-                        var newBrush = ci.Brush;
-                        _undoManager.Record(new StyleChangeAction(
-                            () => { tb.Foreground = oldFg; tb.BorderBrush = oldBc; if (_selectedItem?.ItemContent == tb && oldFg is SolidColorBrush sb) SelectColorInComboBox(sb); },
-                            () => { tb.Foreground = newBrush; tb.BorderBrush = newBrush; if (_selectedItem?.ItemContent == tb) SelectColorInComboBox(newBrush); }
-                        ));
-                        tb.Foreground = newBrush;
-                        tb.BorderBrush = newBrush;
-                    }
-                    else if (_selectedItem.ItemContent is Shape shape)
-                    {
-                        var oldStroke = shape.Stroke;
-                        var newBrush = ci.Brush;
-                        _undoManager.Record(new StyleChangeAction(
-                            () => { shape.Stroke = oldStroke; if (_selectedItem?.ItemContent == shape && oldStroke is SolidColorBrush sb) SelectColorInComboBox(sb); },
-                            () => { shape.Stroke = newBrush; if (_selectedItem?.ItemContent == shape) SelectColorInComboBox(newBrush); }
-                        ));
-                        shape.Stroke = newBrush;
-                    }
-                    else if (_selectedItem.ItemContent is Viewbox vb && vb.Child is WpfPath path)
-                    {
-                        var oldStroke = path.Stroke;
-                        var newBrush = ci.Brush;
-                        _undoManager.Record(new StyleChangeAction(
-                            () => { path.Stroke = oldStroke; if (_selectedItem?.ItemContent == vb && oldStroke is SolidColorBrush sb) SelectColorInComboBox(sb); },
-                            () => { path.Stroke = newBrush; if (_selectedItem?.ItemContent == vb) SelectColorInComboBox(newBrush); }
-                        ));
-                        path.Stroke = newBrush;
-                    }
+                    var oldFg = tb.Foreground;
+                    var oldBc = tb.BorderBrush;
+                    var newBrush = ci.Brush;
+                    _undoManager.Record(new StyleChangeAction(
+                        () => { tb.Foreground = oldFg; tb.BorderBrush = oldBc; if (_selectedItem?.ItemContent == tb && oldFg is SolidColorBrush sb) SelectColorInComboBox(sb); },
+                        () => { tb.Foreground = newBrush; tb.BorderBrush = newBrush; if (_selectedItem?.ItemContent == tb) SelectColorInComboBox(newBrush); }
+                    ));
+                    tb.Foreground = newBrush;
+                    tb.BorderBrush = newBrush;
+                }
+                else if (_selectedItem.ItemContent is Shape shape)
+                {
+                    var oldStroke = shape.Stroke;
+                    var newBrush = ci.Brush;
+                    _undoManager.Record(new StyleChangeAction(
+                        () => { shape.Stroke = oldStroke; if (_selectedItem?.ItemContent == shape && oldStroke is SolidColorBrush sb) SelectColorInComboBox(sb); },
+                        () => { shape.Stroke = newBrush; if (_selectedItem?.ItemContent == shape) SelectColorInComboBox(newBrush); }
+                    ));
+                    shape.Stroke = newBrush;
+                }
+                else if (_selectedItem.ItemContent is Viewbox vb && vb.Child is WpfPath path)
+                {
+                    var oldStroke = path.Stroke;
+                    var newBrush = ci.Brush;
+                    _undoManager.Record(new StyleChangeAction(
+                        () => { path.Stroke = oldStroke; if (_selectedItem?.ItemContent == vb && oldStroke is SolidColorBrush sb) SelectColorInComboBox(sb); },
+                        () => { path.Stroke = newBrush; if (_selectedItem?.ItemContent == vb) SelectColorInComboBox(newBrush); }
+                    ));
+                    path.Stroke = newBrush;
                 }
             }
         }
@@ -1039,42 +1135,37 @@ namespace EasyPhotoEditer
         {
             if (_isUpdatingToolbarFromSelection) return;
 
-            if (CbStrokeThickness.SelectedItem is ThicknessItem ti)
+            if (_selectedItem != null && CbStrokeThickness.SelectedItem is ThicknessItem ti)
             {
-                _defaultStrokeThickness = ti.Value;
-
-                if (_selectedItem != null)
+                if (_selectedItem.ItemContent is TextBox tb)
                 {
-                    if (_selectedItem.ItemContent is TextBox tb)
-                    {
-                        var oldThick = tb.BorderThickness;
-                        var newThick = new Thickness(ti.Value);
-                        _undoManager.Record(new StyleChangeAction(
-                            () => { tb.BorderThickness = oldThick; if (_selectedItem?.ItemContent == tb) SelectThicknessInComboBox(oldThick.Top); },
-                            () => { tb.BorderThickness = newThick; if (_selectedItem?.ItemContent == tb) SelectThicknessInComboBox(newThick.Top); }
-                        ));
-                        tb.BorderThickness = newThick;
-                    }
-                    else if (_selectedItem.ItemContent is Shape shape)
-                    {
-                        var oldThick = shape.StrokeThickness;
-                        var newThick = ti.Value;
-                        _undoManager.Record(new StyleChangeAction(
-                            () => { shape.StrokeThickness = oldThick; if (_selectedItem?.ItemContent == shape) SelectThicknessInComboBox(oldThick); },
-                            () => { shape.StrokeThickness = newThick; if (_selectedItem?.ItemContent == shape) SelectThicknessInComboBox(newThick); }
-                        ));
-                        shape.StrokeThickness = newThick;
-                    }
-                    else if (_selectedItem.ItemContent is Viewbox vb && vb.Child is WpfPath path)
-                    {
-                        var oldThick = path.StrokeThickness;
-                        var newThick = ti.Value;
-                        _undoManager.Record(new StyleChangeAction(
-                            () => { path.StrokeThickness = oldThick; if (_selectedItem?.ItemContent == vb) SelectThicknessInComboBox(oldThick); },
-                            () => { path.StrokeThickness = newThick; if (_selectedItem?.ItemContent == vb) SelectThicknessInComboBox(newThick); }
-                        ));
-                        path.StrokeThickness = newThick;
-                    }
+                    var oldThick = tb.BorderThickness;
+                    var newThick = new Thickness(ti.Value);
+                    _undoManager.Record(new StyleChangeAction(
+                        () => { tb.BorderThickness = oldThick; if (_selectedItem?.ItemContent == tb) SelectThicknessInComboBox(oldThick.Top); },
+                        () => { tb.BorderThickness = newThick; if (_selectedItem?.ItemContent == tb) SelectThicknessInComboBox(newThick.Top); }
+                    ));
+                    tb.BorderThickness = newThick;
+                }
+                else if (_selectedItem.ItemContent is Shape shape)
+                {
+                    var oldThick = shape.StrokeThickness;
+                    var newThick = ti.Value;
+                    _undoManager.Record(new StyleChangeAction(
+                        () => { shape.StrokeThickness = oldThick; if (_selectedItem?.ItemContent == shape) SelectThicknessInComboBox(oldThick); },
+                        () => { shape.StrokeThickness = newThick; if (_selectedItem?.ItemContent == shape) SelectThicknessInComboBox(newThick); }
+                    ));
+                    shape.StrokeThickness = newThick;
+                }
+                else if (_selectedItem.ItemContent is Viewbox vb && vb.Child is WpfPath path)
+                {
+                    var oldThick = path.StrokeThickness;
+                    var newThick = ti.Value;
+                    _undoManager.Record(new StyleChangeAction(
+                        () => { path.StrokeThickness = oldThick; if (_selectedItem?.ItemContent == vb) SelectThicknessInComboBox(oldThick); },
+                        () => { path.StrokeThickness = newThick; if (_selectedItem?.ItemContent == vb) SelectThicknessInComboBox(newThick); }
+                    ));
+                    path.StrokeThickness = newThick;
                 }
             }
         }
