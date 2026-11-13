@@ -11,6 +11,8 @@
         Drop="Window_Drop"
         Loaded="Window_Loaded"
         KeyDown="Window_KeyDown"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewKeyUp="Window_PreviewKeyUp"
         Closing="Window_Closing">
     <Window.Resources>
         <!-- ツールバー用通常ボタンスタイル -->

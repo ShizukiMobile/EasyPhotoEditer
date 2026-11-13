@@ -82,6 +82,10 @@ namespace EasyPhotoEditer
         private bool _isDrawing;
         private Point _drawStartPoint;
 
+        // 方向キー移動のUndo管理用
+        private EditableItem? _arrowMovingItem;
+        private Rect _arrowMoveStartRect;
+
         // ツールバー選択連動フラグ
         private bool _isUpdatingToolbarFromSelection;
 
@@ -914,21 +918,11 @@ namespace EasyPhotoEditer
                         FontFamily = textFont,
                         AcceptsReturn = true,
                         TextWrapping = TextWrapping.Wrap,
-                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                        VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
                     };
                     item.ItemContent = textControl;
-
-                    // テキスト変更時の Undo/Redo 追跡
-                    string textBefore = textControl.Text;
-                    textControl.GotFocus += (s, e) => textBefore = textControl.Text;
-                    textControl.LostFocus += (s, e) =>
-                    {
-                        if (textControl.Text != textBefore)
-                        {
-                            _undoManager.Record(new TextChangedAction(textControl, textBefore, textControl.Text));
-                            textBefore = textControl.Text;
-                        }
-                    };
+                    AttachTextBoxBehavior(item, textControl);
                     break;
 
                 case ToolType.Circle:
@@ -989,14 +983,75 @@ namespace EasyPhotoEditer
             // 挿入直後に選択状態にする
             SelectItem(item);
 
-            // テキストボックスの場合は即座に入力可能にする
+            // テキストボックスの場合は即座に入力可能にし、高さを自動調整
             if (textControl != null)
             {
+                AdjustTextBoxHeight(item, textControl);
                 Dispatcher.BeginInvoke(() =>
                 {
                     textControl.Focus();
                     textControl.SelectAll();
                 }, System.Windows.Threading.DispatcherPriority.Input);
+            }
+        }
+
+        private void AttachTextBoxBehavior(EditableItem item, TextBox textBox)
+        {
+            textBox.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
+            textBox.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+
+            // テキスト変更時の Undo/Redo 追跡
+            string textBefore = textBox.Text;
+            textBox.GotFocus += (s, e) => textBefore = textBox.Text;
+            textBox.LostFocus += (s, e) =>
+            {
+                if (textBox.Text != textBefore)
+                {
+                    _undoManager.Record(new TextChangedAction(textBox, textBefore, textBox.Text));
+                    textBefore = textBox.Text;
+                }
+            };
+
+            // 文字入力や枠幅変更時に見切れないよう高さを自動調整
+            textBox.TextChanged += (s, e) => AdjustTextBoxHeight(item, textBox);
+            item.SizeChanged += (s, e) => AdjustTextBoxHeight(item, textBox);
+        }
+
+        private void AdjustTextBoxHeight(EditableItem item, TextBox tb)
+        {
+            double itemWidth = item.ActualWidth > 0 ? item.ActualWidth : item.Width;
+            if (double.IsNaN(itemWidth) || itemWidth <= 8) return;
+
+            double tbAvailableWidth = Math.Max(10, itemWidth - 8);
+
+            string measureText = string.IsNullOrEmpty(tb.Text) ? " " : tb.Text;
+            if (measureText.EndsWith('\n') || measureText.EndsWith('\r'))
+            {
+                measureText += " ";
+            }
+
+            var measureBox = new TextBox
+            {
+                Text = measureText,
+                FontFamily = tb.FontFamily,
+                FontSize = tb.FontSize,
+                FontWeight = tb.FontWeight,
+                FontStyle = tb.FontStyle,
+                BorderThickness = tb.BorderThickness,
+                Padding = tb.Padding,
+                TextWrapping = TextWrapping.Wrap,
+                AcceptsReturn = true,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
+
+            measureBox.Measure(new Size(tbAvailableWidth, double.PositiveInfinity));
+            double requiredItemHeight = Math.Ceiling(measureBox.DesiredSize.Height) + 8;
+
+            double currentItemHeight = item.ActualHeight > 0 ? item.ActualHeight : item.Height;
+            if (double.IsNaN(currentItemHeight) || requiredItemHeight > currentItemHeight + 0.5)
+            {
+                item.Height = requiredItemHeight;
             }
         }
 
@@ -1068,6 +1123,73 @@ namespace EasyPhotoEditer
                     DeleteSelectedItem();
                     e.Handled = true;
                 }
+            }
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key is not (Key.Left or Key.Right or Key.Up or Key.Down))
+            {
+                return;
+            }
+
+            // 文字入力中やコントロール操作中は方向キー移動を行わない（文字カーソル移動などを優先）
+            if (Keyboard.FocusedElement is TextBox or ComboBox or ComboBoxItem)
+            {
+                return;
+            }
+
+            if (_selectedItem == null)
+            {
+                return;
+            }
+
+            if (_arrowMovingItem != _selectedItem)
+            {
+                _arrowMovingItem = _selectedItem;
+                _arrowMoveStartRect = _selectedItem.GetCurrentRect();
+            }
+
+            double dx = e.Key switch
+            {
+                Key.Left => -1.0,
+                Key.Right => 1.0,
+                _ => 0.0
+            };
+            double dy = e.Key switch
+            {
+                Key.Up => -1.0,
+                Key.Down => 1.0,
+                _ => 0.0
+            };
+
+            double curLeft = Canvas.GetLeft(_selectedItem);
+            if (double.IsNaN(curLeft)) curLeft = 0;
+            double curTop = Canvas.GetTop(_selectedItem);
+            if (double.IsNaN(curTop)) curTop = 0;
+
+            Canvas.SetLeft(_selectedItem, curLeft + dx);
+            Canvas.SetTop(_selectedItem, curTop + dy);
+
+            e.Handled = true;
+        }
+
+        private void Window_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key is not (Key.Left or Key.Right or Key.Up or Key.Down))
+            {
+                return;
+            }
+
+            if (_arrowMovingItem != null)
+            {
+                var endRect = _arrowMovingItem.GetCurrentRect();
+                if (Math.Abs(endRect.X - _arrowMoveStartRect.X) > 0.5 ||
+                    Math.Abs(endRect.Y - _arrowMoveStartRect.Y) > 0.5)
+                {
+                    _undoManager.Record(new TransformObjectAction(_arrowMovingItem, _arrowMoveStartRect, endRect, SelectItem));
+                }
+                _arrowMovingItem = null;
             }
         }
 
@@ -1197,15 +1319,17 @@ namespace EasyPhotoEditer
 
             if (_selectedItem?.ItemContent is TextBox tb && CbFontFamily.SelectedItem is FontItem fi)
             {
+                var item = _selectedItem;
                 if (tb.FontFamily.Source != fi.FontFamily.Source)
                 {
                     var oldFont = tb.FontFamily;
                     var newFont = fi.FontFamily;
                     _undoManager.Record(new StyleChangeAction(
-                        () => { tb.FontFamily = oldFont; if (_selectedItem?.ItemContent == tb) SelectFontInComboBox(oldFont); },
-                        () => { tb.FontFamily = newFont; if (_selectedItem?.ItemContent == tb) SelectFontInComboBox(newFont); }
+                        () => { tb.FontFamily = oldFont; AdjustTextBoxHeight(item, tb); if (_selectedItem?.ItemContent == tb) SelectFontInComboBox(oldFont); },
+                        () => { tb.FontFamily = newFont; AdjustTextBoxHeight(item, tb); if (_selectedItem?.ItemContent == tb) SelectFontInComboBox(newFont); }
                     ));
                     tb.FontFamily = newFont;
+                    AdjustTextBoxHeight(item, tb);
                 }
             }
         }
@@ -1243,13 +1367,15 @@ namespace EasyPhotoEditer
         {
             if (_selectedItem?.ItemContent is TextBox tb && Math.Abs(tb.FontSize - size) > 0.1)
             {
+                var item = _selectedItem;
                 var oldSize = tb.FontSize;
                 var newSize = size;
                 _undoManager.Record(new StyleChangeAction(
-                    () => { tb.FontSize = oldSize; if (_selectedItem?.ItemContent == tb) CbFontSize.Text = oldSize.ToString("0"); },
-                    () => { tb.FontSize = newSize; if (_selectedItem?.ItemContent == tb) CbFontSize.Text = newSize.ToString("0"); }
+                    () => { tb.FontSize = oldSize; AdjustTextBoxHeight(item, tb); if (_selectedItem?.ItemContent == tb) CbFontSize.Text = oldSize.ToString("0"); },
+                    () => { tb.FontSize = newSize; AdjustTextBoxHeight(item, tb); if (_selectedItem?.ItemContent == tb) CbFontSize.Text = newSize.ToString("0"); }
                 ));
                 tb.FontSize = newSize;
+                AdjustTextBoxHeight(item, tb);
             }
         }
 
@@ -1302,13 +1428,15 @@ namespace EasyPhotoEditer
             {
                 if (_selectedItem.ItemContent is TextBox tb)
                 {
+                    var item = _selectedItem;
                     var oldThick = tb.BorderThickness;
                     var newThick = new Thickness(ti.Value);
                     _undoManager.Record(new StyleChangeAction(
-                        () => { tb.BorderThickness = oldThick; if (_selectedItem?.ItemContent == tb) SelectThicknessInComboBox(oldThick.Top); },
-                        () => { tb.BorderThickness = newThick; if (_selectedItem?.ItemContent == tb) SelectThicknessInComboBox(newThick.Top); }
+                        () => { tb.BorderThickness = oldThick; AdjustTextBoxHeight(item, tb); if (_selectedItem?.ItemContent == tb) SelectThicknessInComboBox(oldThick.Top); },
+                        () => { tb.BorderThickness = newThick; AdjustTextBoxHeight(item, tb); if (_selectedItem?.ItemContent == tb) SelectThicknessInComboBox(newThick.Top); }
                     ));
                     tb.BorderThickness = newThick;
+                    AdjustTextBoxHeight(item, tb);
                 }
                 else if (_selectedItem.ItemContent is Shape shape)
                 {
@@ -1611,21 +1739,12 @@ namespace EasyPhotoEditer
                     FontFamily = srcTb.FontFamily,
                     AcceptsReturn = srcTb.AcceptsReturn,
                     TextWrapping = srcTb.TextWrapping,
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-                };
-
-                string textBefore = newTextBox.Text;
-                newTextBox.GotFocus += (s, e) => textBefore = newTextBox.Text;
-                newTextBox.LostFocus += (s, e) =>
-                {
-                    if (newTextBox.Text != textBefore)
-                    {
-                        _undoManager.Record(new TextChangedAction(newTextBox, textBefore, newTextBox.Text));
-                        textBefore = newTextBox.Text;
-                    }
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
                 };
 
                 newItem.ItemContent = newTextBox;
+                AttachTextBoxBehavior(newItem, newTextBox);
             }
             else if (_selectedItem.ItemContent is Ellipse srcEllipse)
             {
@@ -1697,6 +1816,7 @@ namespace EasyPhotoEditer
 
             if (newTextBox != null)
             {
+                AdjustTextBoxHeight(newItem, newTextBox);
                 Dispatcher.BeginInvoke(() =>
                 {
                     newTextBox.Focus();

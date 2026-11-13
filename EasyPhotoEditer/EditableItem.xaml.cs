@@ -98,6 +98,7 @@ namespace EasyPhotoEditer
         private void MoveBorder_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             Selected?.Invoke(this, EventArgs.Empty);
+            Focus();
 
             if (Parent is Canvas canvas)
             {
