@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:EasyPhotoEditer"
         mc:Ignorable="d"
-        Title="EasyPhotoEditer" Height="650" Width="980"
+        Title="EasyPhotoEditer" Height="680" Width="1120" MinHeight="450" MinWidth="1070"
         AllowDrop="True"
         DragOver="Window_DragOver"
         Drop="Window_Drop"
@@ -220,15 +220,15 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- ダークテーマ ContextMenu 内の Separator スタイル -->
+        <!-- ダークテーマ メニュー内の Separator スタイル -->
         <Style x:Key="DarkMenuSeparator" TargetType="Separator">
             <Setter Property="Height" Value="1" />
-            <Setter Property="Margin" Value="4,3" />
-            <Setter Property="Background" Value="#3F3F46" />
+            <Setter Property="Margin" Value="6,3" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Separator">
-                        <Rectangle Height="1" Fill="#3F3F46" Margin="4,2" />
+                        <Rectangle Height="1" Fill="#3A3A3E" HorizontalAlignment="Stretch" />
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -335,6 +335,59 @@
             </Setter>
         </Style>
 
+        <!-- ダークテーマ メニューバー用トップレベルテンプレート -->
+        <ControlTemplate x:Key="TopLevelMenuItemTemplate" TargetType="MenuItem">
+            <Grid>
+                <Border x:Name="bd"
+                        Background="Transparent"
+                        CornerRadius="3"
+                        Margin="2,2"
+                        Padding="10,4">
+                    <ContentPresenter ContentSource="Header"
+                                      RecognizesAccessKey="True"
+                                      VerticalAlignment="Center" />
+                </Border>
+                <Popup x:Name="PART_Popup"
+                       AllowsTransparency="True"
+                       Placement="Bottom"
+                       IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                       Focusable="False"
+                       PopupAnimation="Fade">
+                    <Border Background="#252526"
+                            BorderBrush="#3F3F46"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="2"
+                            Margin="0,1,0,0"
+                            Grid.IsSharedSizeScope="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.5" Color="Black" />
+                        </Border.Effect>
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </Border>
+                </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter TargetName="bd" Property="Background" Value="#3E3E42" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+                <Trigger Property="IsSubmenuOpen" Value="True">
+                    <Setter TargetName="bd" Property="Background" Value="#3E3E42" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- ダークテーマ メニューバー用 MenuItem スタイル -->
+        <Style x:Key="DarkMainMenuItem" TargetType="MenuItem" BasedOn="{StaticResource DarkContextMenuItem}">
+            <Style.Triggers>
+                <Trigger Property="Role" Value="TopLevelHeader">
+                    <Setter Property="Template" Value="{StaticResource TopLevelMenuItemTemplate}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- ダークテーマ ContextMenu 専用スタイル -->
         <Style x:Key="DarkContextMenu" TargetType="ContextMenu">
             <Setter Property="SnapsToDevicePixels" Value="True" />
@@ -401,7 +454,16 @@
     </Window.InputBindings>
     <DockPanel>
         <!-- メニューバー -->
-        <Menu DockPanel.Dock="Top">
+        <Menu DockPanel.Dock="Top"
+              Background="#1E1E1E"
+              Foreground="#E0E0E0"
+              BorderBrush="#3F3F46"
+              BorderThickness="0,0,0,1"
+              Padding="4,1">
+            <Menu.Resources>
+                <Style TargetType="MenuItem" BasedOn="{StaticResource DarkMainMenuItem}" />
+                <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}" TargetType="Separator" BasedOn="{StaticResource DarkMenuSeparator}" />
+            </Menu.Resources>
             <MenuItem Header="ファイル(_F)">
                 <MenuItem Header="開く(_O)..." InputGestureText="Ctrl+O" Command="{x:Static local:MainWindow.OpenCommand}" />
                 <MenuItem Header="編集した画像を保存(_S)..." InputGestureText="Ctrl+S" Command="{x:Static local:MainWindow.SaveCommand}" />
@@ -641,7 +703,26 @@
         </Border>
 
         <!-- ステータスバー -->
-        <StatusBar DockPanel.Dock="Bottom">
+        <StatusBar DockPanel.Dock="Bottom"
+                   Background="#252526"
+                   Foreground="#CCCCCC"
+                   BorderBrush="#3F3F46"
+                   BorderThickness="0,1,0,0"
+                   Padding="6,2">
+            <StatusBar.Resources>
+                <Style TargetType="Separator">
+                    <Setter Property="Width" Value="1" />
+                    <Setter Property="Height" Value="14" />
+                    <Setter Property="Margin" Value="6,0" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Separator">
+                                <Rectangle Width="1" Height="14" Fill="#3F3F46" />
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </StatusBar.Resources>
             <StatusBarItem>
                 <TextBlock x:Name="StatusInfoText" Text="準備完了" />
             </StatusBarItem>

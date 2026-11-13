@@ -96,6 +96,7 @@ namespace EasyPhotoEditer
         public MainWindow(string? initialFilePath)
         {
             InitializeComponent();
+            WindowThemeHelper.ApplyDarkTitleBar(this);
             _initialFilePath = initialFilePath;
 
             _settings = AppSettings.Load();

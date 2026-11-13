@@ -7,6 +7,7 @@ namespace EasyPhotoEditer
         public ConfirmExitDialog()
         {
             InitializeComponent();
+            WindowThemeHelper.ApplyDarkTitleBar(this);
         }
 
         private void BtnExit_Click(object sender, RoutedEventArgs e)

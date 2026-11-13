@@ -11,6 +11,7 @@ namespace EasyPhotoEditer
         public OptionsWindow(AppSettings settings)
         {
             InitializeComponent();
+            WindowThemeHelper.ApplyDarkTitleBar(this);
             CurrentSettings = settings.Clone();
 
             InitializeControls();
