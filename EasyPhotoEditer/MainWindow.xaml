@@ -787,7 +787,7 @@
                                 MouseLeftButtonUp="ImageCanvas_MouseLeftButtonUp"
                                 MouseRightButtonUp="ImageCanvas_MouseRightButtonUp">
                             <Image x:Name="CanvasImage"
-                                   Stretch="None"
+                                   Stretch="Fill"
                                    RenderOptions.BitmapScalingMode="NearestNeighbor" />
                             <!-- ドラッグ作成時のプレビュー枠 -->
                             <Rectangle x:Name="RubberBand"
