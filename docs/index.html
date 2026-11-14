@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasyPhotoEditer - シンプル＆軽量な Windows 画像注釈・編集ソフト</title>
+    <meta name="description" content="EasyPhotoEditer は、スクリーンショットの注釈入れや資料作成、自己紹介カード・プロフィールカードの制作を手軽に行える、Windows 向け無料画像編集ソフトです。">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="site-header" id="top">
+        <div class="container header-inner">
+            <a href="#top" class="brand">
+                <img src="favicon.ico" alt="EasyPhotoEditer アイコン" class="brand-icon">
+                <span class="brand-name">EasyPhotoEditer</span>
+            </a>
+
+            <nav class="nav-links" id="navLinks" aria-label="メインナビゲーション">
+                <a href="#features">主な機能</a>
+                <a href="#workflow">使い方</a>
+                <a href="#shortcuts">ショートカット</a>
+                <a href="#download">ダウンロード</a>
+                <a href="https://github.com/ShizukiMobile/EasyPhotoEditer" target="_blank" rel="noopener noreferrer" class="nav-github">
+                    GitHub
+                </a>
+                <a href="https://github.com/ShizukiMobile/EasyPhotoEditer/releases/download/v1.0.0/EasyPhotoEditer_v1.0.0.zip" class="btn btn-primary btn-sm">
+                    ダウンロード
+                </a>
+            </nav>
+
+            <button class="menu-toggle" id="menuToggle" aria-label="メニューを開く" aria-expanded="false">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <!-- ヒーローセクション -->
+        <section class="hero">
+            <div class="hero-glow"></div>
+            <div class="container hero-grid">
+                <div class="hero-content">
+                    <div class="badge-row">
+                        <span class="badge badge-version">v1.0.0 リリース</span>
+                        <span class="badge badge-os">Windows 10 / 11 (64bit)</span>
+                        <span class="badge badge-free">無料・インストール不要</span>
+                    </div>
+                    <h1 class="hero-title">
+                        画像への注釈・図形入れを<br>
+                        <span class="accent-text">もっと手軽に、美しく。</span>
+                    </h1>
+                    <p class="hero-subtitle">
+                        EasyPhotoEditer は、テキスト追加・図形描画・別画像の合成やトリミングを直感的に行える
+                        Windows 向けの軽量画像エディタです。ダークテーマの落ち着いた UI と万が一の異常終了時に備えたバックアップ復元機能で、
+                        日々のスクリーンショット加工や資料作成はもちろん、SNS 用の自己紹介カードやプロフィールカードの制作にも幅広く活用できます。
+                    </p>
+                    <div class="hero-actions">
+                        <a href="https://github.com/ShizukiMobile/EasyPhotoEditer/releases/download/v1.0.0/EasyPhotoEditer_v1.0.0.zip" class="btn btn-primary btn-lg">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            無料ダウンロード (v1.0.0 ZIP)
+                        </a>
+                        <a href="https://github.com/ShizukiMobile/EasyPhotoEditer" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-lg">
+                            GitHub リポジトリ
+                        </a>
+                    </div>
+                    <p class="hero-note">
+                        ZIP を展開して <code>EasyPhotoEditer.exe</code> を開くだけですぐに使えます。
+                    </p>
+                </div>
+
+                <!-- アプリ実際のスクリーンショット -->
+                <div class="hero-preview">
+                    <figure class="hero-screenshot-frame">
+                        <button type="button" class="screenshot-trigger" id="screenshotTrigger" aria-label="スクリーンショットを拡大表示">
+                            <img src="assets/screenshot.png"
+                                 alt="EasyPhotoEditer でプロフィールカードを編集している画面のスクリーンショット"
+                                 class="hero-screenshot">
+                            <span class="screenshot-zoom-hint" aria-hidden="true">クリックで拡大</span>
+                        </button>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- 主な機能 -->
+        <section class="section" id="features">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-kicker">FEATURES</span>
+                    <h2 class="section-title">必要な機能を、迷わない操作性で</h2>
+                    <p class="section-desc">
+                        高機能すぎるペイントソフトは不要な場面に最適化。画像を開いて数秒で注釈や図形を追加し、すぐに保存できます。
+                    </p>
+                </div>
+
+                <div class="features-grid">
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+                                <path d="M9 12l2 2 4-4"></path>
+                            </svg>
+                        </div>
+                        <h3>豊富な図形・テキスト注釈</h3>
+                        <p>
+                            テキストボックス、丸（円）、四角形、角丸四角形、チェックマークをワンクリックで配置。
+                            フォント・文字サイズ・文字色・枠線の色や太さまで細かく調整できます。
+                        </p>
+                    </article>
+
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                        </div>
+                        <h3>画像の挿入＆図形トリミング</h3>
+                        <p>
+                            編集中の画像の上に別の画像やアイコンを重ねて配置可能。
+                            挿入した画像は「丸」や「角丸四角形」にワンタッチでトリミングでき、重ね順変更や複製にも対応。
+                            自己紹介カードやプロフィールカードの制作にも最適です。
+                        </p>
+                    </article>
+
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                        </div>
+                        <h3>快適な編集ワークフロー</h3>
+                        <p>
+                            画像のドラッグ＆ドロップ読み込み、元に戻す / やり直す、柔軟なズーム操作やウィンドウフィット表示に対応。
+                            オプション画面でよく使う既定のスタイルを保存し、次回から同じ設定で素早く描画できます。
+                        </p>
+                    </article>
+
+                    <article class="feature-card">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                        </div>
+                        <h3>自動バックアップ＆安心のリカバリ機能</h3>
+                        <p>
+                            編集中の作業内容を元画像とは別に随時バックグラウンドで一時バックアップ。
+                            万が一アプリが予期せず終了した場合でも、次回起動時の復元ダイアログから編集状態をそのまま復元できます。
+                        </p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- 使い方 -->
+        <section class="section section-alt" id="workflow">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-kicker">HOW TO USE</span>
+                    <h2 class="section-title">3ステップですぐに編集スタート</h2>
+                    <p class="section-desc">
+                        インストーラーや面倒な初期設定は一切不要。ダウンロードして解凍すればすぐに使えます。
+                    </p>
+                </div>
+
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-num">01</div>
+                        <h3>ダウンロードして展開</h3>
+                        <p>
+                            <a href="https://github.com/ShizukiMobile/EasyPhotoEditer/releases/download/v1.0.0/EasyPhotoEditer_v1.0.0.zip">EasyPhotoEditer_v1.0.0.zip</a>
+                            をダウンロードし、任意のフォルダへ展開します。
+                        </p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">02</div>
+                        <h3>アプリを起動して画像をドロップ</h3>
+                        <p>
+                            <code>EasyPhotoEditer.exe</code> を起動し、編集したい画像ファイルをウィンドウへドラッグ＆ドロップ（または <code>Ctrl+O</code>）します。
+                        </p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-num">03</div>
+                        <h3>注釈を入れて保存</h3>
+                        <p>
+                            ツールバーや右クリックメニューからテキストや図形・画像を配置し、<code>Ctrl+S</code> で編集後の画像を書き出して完了です。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ショートカットキー -->
+        <section class="section" id="shortcuts">
+            <div class="container">
+                <div class="section-header">
+                    <span class="section-kicker">SHORTCUTS</span>
+                    <h2 class="section-title">主なショートカットキー</h2>
+                    <p class="section-desc">
+                        キーボード操作を組み合わせることで、さらにスピーディーに編集できます。
+                    </p>
+                </div>
+
+                <div class="shortcut-table-wrap">
+                    <table class="shortcut-table">
+                        <thead>
+                            <tr>
+                                <th>操作</th>
+                                <th>ショートカット</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>画像を開く</td>
+                                <td><kbd>Ctrl</kbd> + <kbd>O</kbd></td>
+                            </tr>
+                            <tr>
+                                <td>編集した画像を保存</td>
+                                <td><kbd>Ctrl</kbd> + <kbd>S</kbd></td>
+                            </tr>
+                            <tr>
+                                <td>元に戻す / やり直す</td>
+                                <td><kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Y</kbd></td>
+                            </tr>
+                            <tr>
+                                <td>選択中の要素を複製</td>
+                                <td><kbd>Ctrl</kbd> + <kbd>D</kbd></td>
+                            </tr>
+                            <tr>
+                                <td>選択中の要素を削除</td>
+                                <td><kbd>Delete</kbd></td>
+                            </tr>
+                            <tr>
+                                <td>ズームイン / アウト / 100%に戻す</td>
+                                <td><kbd>Ctrl</kbd> + <kbd>+</kbd> / <kbd>-</kbd> / <kbd>0</kbd></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ダウンロード＆動作環境 -->
+        <section class="section section-alt" id="download">
+            <div class="container">
+                <div class="download-box">
+                    <div class="download-info">
+                        <span class="section-kicker">DOWNLOAD</span>
+                        <h2>EasyPhotoEditer v1.0.0</h2>
+                        <p>
+                            Windows 向けのポータブル版 ZIP パッケージです。解凍するだけでそのまま起動できます。
+                        </p>
+                        <ul class="spec-list">
+                            <li><strong>対応 OS：</strong>Windows 10 / Windows 11 (64bit)</li>
+                            <li><strong>配布形式：</strong>ZIP アーカイブ（インストール不要）</li>
+                            <li><strong>バージョン：</strong>1.0.0</li>
+                            <li><strong>サポート・不具合報告：</strong><a href="https://github.com/ShizukiMobile/EasyPhotoEditer/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="download-cta">
+                        <a href="https://github.com/ShizukiMobile/EasyPhotoEditer/releases/download/v1.0.0/EasyPhotoEditer_v1.0.0.zip" class="btn btn-primary btn-lg btn-block">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            EasyPhotoEditer_v1.0.0.zip をダウンロード
+                        </a>
+                        <a href="https://github.com/ShizukiMobile/EasyPhotoEditer/releases" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-block">
+                            リリースノート・過去のバージョンを見る
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- フッター -->
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <div class="footer-brand">
+                <img src="favicon.ico" alt="" class="footer-icon">
+                <span>EasyPhotoEditer</span>
+            </div>
+            <div class="footer-links">
+                <a href="#top">トップ</a>
+                <a href="#features">主な機能</a>
+                <a href="#download">ダウンロード</a>
+                <a href="https://github.com/ShizukiMobile/EasyPhotoEditer" target="_blank" rel="noopener noreferrer">GitHub</a>
+            </div>
+            <p class="copyright">&copy; 2026 EasyPhotoEditer / ShizukiMobile</p>
+        </div>
+    </footer>
+
+    <!-- 画像拡大モーダル (ライトボックス) -->
+    <div class="lightbox" id="imageLightbox" hidden role="dialog" aria-modal="true" aria-label="スクリーンショット拡大表示">
+        <button type="button" class="lightbox-close" id="lightboxClose" aria-label="閉じる">&times;</button>
+        <div class="lightbox-content">
+            <img src="assets/screenshot.png"
+                 alt="EasyPhotoEditer でプロフィールカードを編集している画面のスクリーンショット（拡大）"
+                 class="lightbox-image">
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
