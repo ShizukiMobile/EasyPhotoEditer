@@ -8,6 +8,7 @@ using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Path = System.IO.Path;
 using WpfPath = System.Windows.Shapes.Path;
@@ -89,8 +90,20 @@ namespace EasyPhotoEditer
         // ツールバー選択連動フラグ
         private bool _isUpdatingToolbarFromSelection;
 
-        public MainWindow() : this(null)
+        // 自動バックアップ（オートセーブ）管理
+        private readonly string _autoSaveId = Guid.NewGuid().ToString("N");
+        private readonly DispatcherTimer _autoSaveDebounceTimer;
+        private readonly DispatcherTimer _autoSavePeriodicTimer;
+        private readonly Dictionary<Image, string> _imageAssetKeys = new();
+        private readonly AutoSaveProject? _restoreProject;
+
+        public MainWindow() : this((string?)null)
         {
+        }
+
+        public MainWindow(AutoSaveProject restoreProject) : this((string?)null)
+        {
+            _restoreProject = restoreProject;
         }
 
         public MainWindow(string? initialFilePath)
@@ -100,6 +113,17 @@ namespace EasyPhotoEditer
             _initialFilePath = initialFilePath;
 
             _settings = AppSettings.Load();
+
+            // オートセーブ用タイマーの初期化
+            _autoSaveDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _autoSaveDebounceTimer.Tick += (s, e) =>
+            {
+                _autoSaveDebounceTimer.Stop();
+                SaveAutoSaveSnapshot();
+            };
+            _autoSavePeriodicTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+            _autoSavePeriodicTimer.Tick += (s, e) => SaveAutoSaveSnapshot();
+            Closed += Window_Closed;
 
             RegisterCommands();
             InitializePropertyControls();
@@ -123,7 +147,11 @@ namespace EasyPhotoEditer
             // 元に戻す (Ctrl+Z) / やり直す (Ctrl+Y)
             CommandBindings.Add(new CommandBinding(ApplicationCommands.Undo, (s, e) => _undoManager.Undo(), (s, e) => e.CanExecute = _undoManager.CanUndo));
             CommandBindings.Add(new CommandBinding(ApplicationCommands.Redo, (s, e) => _undoManager.Redo(), (s, e) => e.CanExecute = _undoManager.CanRedo));
-            _undoManager.StateChanged += (s, e) => CommandManager.InvalidateRequerySuggested();
+            _undoManager.StateChanged += (s, e) =>
+            {
+                CommandManager.InvalidateRequerySuggested();
+                ScheduleAutoSave();
+            };
         }
 
         private void InitializePropertyControls()
@@ -226,7 +254,11 @@ namespace EasyPhotoEditer
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(_initialFilePath) && File.Exists(_initialFilePath))
+            if (_restoreProject != null)
+            {
+                RestoreFromAutoSave(_restoreProject);
+            }
+            else if (!string.IsNullOrEmpty(_initialFilePath) && File.Exists(_initialFilePath))
             {
                 LoadImageFromFile(_initialFilePath);
             }
@@ -234,13 +266,24 @@ namespace EasyPhotoEditer
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {
-            if (_settings.ConfirmOnExit)
+            if (!App.IsCrashing && _settings.ConfirmOnExit)
             {
                 var dialog = new ConfirmExitDialog { Owner = this };
                 if (dialog.ShowDialog() != true)
                 {
                     e.Cancel = true;
                 }
+            }
+        }
+
+        private void Window_Closed(object? sender, EventArgs e)
+        {
+            _autoSaveDebounceTimer.Stop();
+            _autoSavePeriodicTimer.Stop();
+
+            if (!App.IsCrashing)
+            {
+                AutoSaveManager.Delete(_autoSaveId);
             }
         }
 
@@ -618,6 +661,12 @@ namespace EasyPhotoEditer
                 Title = $"{fileName} ({pixelWidth} × {pixelHeight} px) - EasyPhotoEditer";
                 StatusInfoText.Text = filePath;
                 CanvasSizeText.Text = $"サイズ: {pixelWidth} × {pixelHeight} px";
+
+                if (!_autoSavePeriodicTimer.IsEnabled)
+                {
+                    _autoSavePeriodicTimer.Start();
+                }
+                ScheduleAutoSave();
             }
             catch (Exception ex)
             {
@@ -1013,8 +1062,12 @@ namespace EasyPhotoEditer
                 }
             };
 
-            // 文字入力や枠幅変更時に見切れないよう高さを自動調整
-            textBox.TextChanged += (s, e) => AdjustTextBoxHeight(item, textBox);
+            // 文字入力や枠幅変更時に見切れないよう高さを自動調整・随時保存予約
+            textBox.TextChanged += (s, e) =>
+            {
+                AdjustTextBoxHeight(item, textBox);
+                ScheduleAutoSave();
+            };
             item.SizeChanged += (s, e) => AdjustTextBoxHeight(item, textBox);
         }
 
@@ -1824,6 +1877,271 @@ namespace EasyPhotoEditer
                     newTextBox.SelectAll();
                 }, System.Windows.Threading.DispatcherPriority.Input);
             }
+        }
+
+        #endregion
+
+        #region 自動保存（オートセーブ）および異常終了リカバリ
+
+        private void ScheduleAutoSave()
+        {
+            if (CanvasContainer.Visibility != Visibility.Visible || string.IsNullOrEmpty(_currentLoadedFilePath))
+            {
+                return;
+            }
+            _autoSaveDebounceTimer.Stop();
+            _autoSaveDebounceTimer.Start();
+        }
+
+        private bool SaveAutoSaveSnapshot()
+        {
+            if (CanvasContainer.Visibility != Visibility.Visible || string.IsNullOrEmpty(_currentLoadedFilePath))
+            {
+                return false;
+            }
+
+            var project = new AutoSaveProject
+            {
+                WindowId = _autoSaveId,
+                BaseImagePath = _currentLoadedFilePath,
+                SavedAt = DateTime.Now
+            };
+
+            foreach (var child in ImageCanvas.Children)
+            {
+                if (child is not EditableItem item) continue;
+
+                var rect = item.GetCurrentRect();
+                var saveItem = new AutoSaveItem
+                {
+                    Left = rect.X,
+                    Top = rect.Y,
+                    Width = rect.Width,
+                    Height = rect.Height
+                };
+
+                if (item.ItemContent is TextBox tb)
+                {
+                    saveItem.ItemType = "TextBox";
+                    saveItem.Text = tb.Text;
+                    saveItem.FontFamily = tb.FontFamily.Source;
+                    saveItem.FontSize = tb.FontSize;
+                    saveItem.ColorHex = (tb.Foreground as SolidColorBrush)?.Color.ToString() ?? "#FFFF0000";
+                    saveItem.StrokeThickness = tb.BorderThickness.Top;
+                }
+                else if (item.ItemContent is Ellipse el)
+                {
+                    saveItem.ItemType = "Circle";
+                    saveItem.ColorHex = (el.Stroke as SolidColorBrush)?.Color.ToString() ?? "#FFFF0000";
+                    saveItem.StrokeThickness = el.StrokeThickness;
+                }
+                else if (item.ItemContent is System.Windows.Shapes.Rectangle rc)
+                {
+                    saveItem.ItemType = rc.RadiusX > 0 ? "RoundedRectangle" : "Rectangle";
+                    saveItem.ColorHex = (rc.Stroke as SolidColorBrush)?.Color.ToString() ?? "#FFFF0000";
+                    saveItem.StrokeThickness = rc.StrokeThickness;
+                }
+                else if (item.ItemContent is Viewbox vb && vb.Child is WpfPath path)
+                {
+                    saveItem.ItemType = "Checkmark";
+                    saveItem.ColorHex = (path.Stroke as SolidColorBrush)?.Color.ToString() ?? "#FFFF0000";
+                    saveItem.StrokeThickness = path.StrokeThickness;
+                }
+                else if (item.ItemContent is Image img && img.Source is BitmapSource bmp)
+                {
+                    saveItem.ItemType = "Image";
+                    if (!_imageAssetKeys.TryGetValue(img, out string? assetKey))
+                    {
+                        assetKey = Guid.NewGuid().ToString("N");
+                        _imageAssetKeys[img] = assetKey;
+                    }
+                    saveItem.AssetImagePath = AutoSaveManager.EnsureImageAssetSaved(bmp, assetKey);
+                    saveItem.ClipType = GetItemClipType(item).ToString();
+                }
+                else
+                {
+                    continue;
+                }
+
+                project.Items.Add(saveItem);
+            }
+
+            AutoSaveManager.Save(_autoSaveId, project);
+            return true;
+        }
+
+        public bool EmergencySave()
+        {
+            try
+            {
+                _autoSaveDebounceTimer.Stop();
+                _autoSavePeriodicTimer.Stop();
+                return SaveAutoSaveSnapshot();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void RestoreFromAutoSave(AutoSaveProject project)
+        {
+            if (string.IsNullOrEmpty(project.BaseImagePath) || !File.Exists(project.BaseImagePath))
+            {
+                MessageBox.Show(this, "復元対象の元画像ファイルが見つかりませんでした。", "復元エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            LoadImageFromFile(project.BaseImagePath);
+
+            foreach (var saved in project.Items)
+            {
+                var item = new EditableItem
+                {
+                    Width = saved.Width,
+                    Height = saved.Height
+                };
+                Canvas.SetLeft(item, saved.Left);
+                Canvas.SetTop(item, saved.Top);
+
+                SolidColorBrush brush = Brushes.Red;
+                if (!string.IsNullOrEmpty(saved.ColorHex))
+                {
+                    try
+                    {
+                        var color = (Color)ColorConverter.ConvertFromString(saved.ColorHex);
+                        brush = new SolidColorBrush(color);
+                        brush.Freeze();
+                    }
+                    catch { }
+                }
+
+                switch (saved.ItemType)
+                {
+                    case "TextBox":
+                        item.IsTextBox = true;
+                        var tb = new TextBox
+                        {
+                            Text = saved.Text ?? "",
+                            Foreground = brush,
+                            Background = Brushes.Transparent,
+                            BorderBrush = brush,
+                            BorderThickness = new Thickness(saved.StrokeThickness),
+                            FontSize = saved.FontSize > 0 ? saved.FontSize : 18,
+                            FontFamily = !string.IsNullOrEmpty(saved.FontFamily) ? new FontFamily(saved.FontFamily) : GetDefaultFontFamily(),
+                            AcceptsReturn = true,
+                            TextWrapping = TextWrapping.Wrap,
+                            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                        };
+                        item.ItemContent = tb;
+                        AttachTextBoxBehavior(item, tb);
+                        break;
+
+                    case "Circle":
+                        item.ItemContent = new Ellipse
+                        {
+                            Stroke = brush,
+                            StrokeThickness = saved.StrokeThickness,
+                            Fill = Brushes.Transparent
+                        };
+                        break;
+
+                    case "Rectangle":
+                        item.ItemContent = new System.Windows.Shapes.Rectangle
+                        {
+                            Stroke = brush,
+                            StrokeThickness = saved.StrokeThickness,
+                            Fill = Brushes.Transparent
+                        };
+                        break;
+
+                    case "RoundedRectangle":
+                        item.ItemContent = new System.Windows.Shapes.Rectangle
+                        {
+                            Stroke = brush,
+                            StrokeThickness = saved.StrokeThickness,
+                            Fill = Brushes.Transparent,
+                            RadiusX = 16,
+                            RadiusY = 16
+                        };
+                        break;
+
+                    case "Checkmark":
+                        var path = new WpfPath
+                        {
+                            Data = Geometry.Parse("M 4,22 L 15,33 L 38,8"),
+                            Stroke = brush,
+                            StrokeThickness = saved.StrokeThickness,
+                            StrokeStartLineCap = PenLineCap.Round,
+                            StrokeEndLineCap = PenLineCap.Round,
+                            StrokeLineJoin = PenLineJoin.Round
+                        };
+                        item.ItemContent = new Viewbox
+                        {
+                            Stretch = Stretch.Uniform,
+                            Child = path
+                        };
+                        break;
+
+                    case "Image":
+                        if (!string.IsNullOrEmpty(saved.AssetImagePath) && File.Exists(saved.AssetImagePath))
+                        {
+                            var bitmap = new BitmapImage();
+                            using (var stream = new FileStream(saved.AssetImagePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                            {
+                                bitmap.BeginInit();
+                                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                                bitmap.StreamSource = stream;
+                                bitmap.EndInit();
+                            }
+                            bitmap.Freeze();
+
+                            var img = new Image
+                            {
+                                Source = bitmap,
+                                Stretch = Stretch.Fill,
+                                Focusable = false
+                            };
+                            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+                            item.ItemContent = img;
+
+                            if (Enum.TryParse<ImageClipType>(saved.ClipType, out var clipType))
+                            {
+                                SetItemClipType(item, clipType);
+                                ApplyImageClip(item, clipType);
+                            }
+
+                            item.SizeChanged += (s, e) =>
+                            {
+                                if (item.ItemContent is Image && GetItemClipType(item) != ImageClipType.None)
+                                {
+                                    ApplyImageClip(item, GetItemClipType(item));
+                                }
+                            };
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                        break;
+
+                    default:
+                        continue;
+                }
+
+                item.Selected += (s, e) => SelectItem(item);
+                item.TransformCompleted += (s, e) => _undoManager.Record(new TransformObjectAction(item, e.Before, e.After, SelectItem));
+
+                ImageCanvas.Children.Add(item);
+            }
+
+            if (!string.IsNullOrEmpty(project.WindowId) && project.WindowId != _autoSaveId)
+            {
+                AutoSaveManager.Delete(project.WindowId);
+            }
+            ScheduleAutoSave();
+            StatusInfoText.Text = "前回の作業内容を復元しました";
         }
 
         #endregion

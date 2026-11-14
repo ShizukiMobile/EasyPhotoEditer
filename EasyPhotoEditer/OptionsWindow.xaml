@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:EasyPhotoEditer"
         mc:Ignorable="d"
         Title="オプション" Height="500" Width="600"
+        Icon="pack://application:,,,/EasyPhotoEditer.ico"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         Background="#252526"

@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:EasyPhotoEditer"
         mc:Ignorable="d"
         Title="EasyPhotoEditer" Height="680" Width="1120" MinHeight="450" MinWidth="1070"
+        Icon="pack://application:,,,/EasyPhotoEditer.ico"
         AllowDrop="True"
         DragOver="Window_DragOver"
         Drop="Window_Drop"
