@@ -497,6 +497,9 @@
                 <MenuItem Header="全体を表示（ウィンドウに合わせる）(_F)" Command="{x:Static local:MainWindow.FitToWindowCommand}" />
                 <MenuItem Header="ウィンドウの横幅に合わせる(_W)" Command="{x:Static local:MainWindow.FitToWidthCommand}" />
             </MenuItem>
+            <MenuItem Header="ヘルプ(_H)">
+                <MenuItem Header="バージョン情報(_A)..." Click="About_Click" />
+            </MenuItem>
         </Menu>
 
         <!-- モダンツールバー -->

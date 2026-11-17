@@ -1,0 +1,140 @@
+<Window x:Class="EasyPhotoEditer.AboutDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="バージョン情報 - EasyPhotoEditer"
+        Icon="pack://application:,,,/EasyPhotoEditer.ico"
+        Height="290" Width="460"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="#252526"
+        Foreground="#E0E0E0"
+        FontFamily="Yu Gothic UI, Segoe UI, Meiryo, sans-serif">
+    <Window.Resources>
+        <Style x:Key="PrimaryOkButton" TargetType="Button">
+            <Setter Property="Width" Value="95" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Background" Value="#0078D7" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#005A9E" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#1C8CE3" />
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#0078D7" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#005A9E" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkHyperlink" TargetType="Hyperlink">
+            <Setter Property="Foreground" Value="#5CB8FF" />
+            <Setter Property="TextDecorations" Value="None" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="#8FD0FF" />
+                    <Setter Property="TextDecorations" Value="Underline" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="52" />
+        </Grid.RowDefinitions>
+
+        <!-- 上部コンテンツ領域 -->
+        <Grid Grid.Row="0" Margin="24,22,24,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="68" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- アプリアイコン -->
+            <Image Grid.Column="0"
+                   Source="pack://application:,,,/EasyPhotoEditer.ico"
+                   Width="56" Height="56"
+                   VerticalAlignment="Top"
+                   HorizontalAlignment="Left"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+
+            <!-- アプリ情報 -->
+            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                <TextBlock Text="EasyPhotoEditer"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="#FFFFFF" />
+                <TextBlock x:Name="TxtVersion"
+                           Text="Version 1.0.1"
+                           FontSize="12.5"
+                           FontWeight="SemiBold"
+                           Foreground="#9CDCFE"
+                           Margin="0,3,0,10" />
+
+                <TextBlock Text="画像へのテキスト追加・図形描画・画像合成・トリミングを手軽に行える Windows 向け画像編集ソフトです。"
+                           FontSize="12"
+                           Foreground="#CCCCCC"
+                           TextWrapping="Wrap"
+                           LineHeight="18"
+                           Margin="0,0,0,10" />
+
+                <TextBlock FontSize="12" Foreground="#B4B8C2" Margin="0,0,0,4">
+                    <Run Text="環境: " />
+                    <Run x:Name="RunRuntime" Text=".NET 10.0 / Windows" Foreground="#E0E0E0" />
+                </TextBlock>
+
+                <TextBlock FontSize="12" Foreground="#B4B8C2" Margin="0,0,0,8">
+                    <Run Text="リンク: " />
+                    <Hyperlink NavigateUri="https://github.com/ShizukiMobile/EasyPhotoEditer"
+                               RequestNavigate="Hyperlink_RequestNavigate"
+                               Style="{StaticResource DarkHyperlink}">GitHub</Hyperlink>
+                    <Run Text="  |  " Foreground="#666666" />
+                    <Hyperlink NavigateUri="https://x.com/shizuki0918"
+                               RequestNavigate="Hyperlink_RequestNavigate"
+                               Style="{StaticResource DarkHyperlink}">X (@shizuki0918)</Hyperlink>
+                </TextBlock>
+
+                <TextBlock x:Name="TxtCopyright"
+                           Text="© 2026 EasyPhotoEditer / ShizukiMobile"
+                           FontSize="11"
+                           Foreground="#8B919E" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 下部アクションバー -->
+        <Border Grid.Row="1"
+                Background="#1E1E1E"
+                BorderBrush="#3F3F46"
+                BorderThickness="0,1,0,0"
+                Padding="16,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Content="OK"
+                        Style="{StaticResource PrimaryOkButton}"
+                        IsDefault="True"
+                        IsCancel="True"
+                        Click="BtnOk_Click" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

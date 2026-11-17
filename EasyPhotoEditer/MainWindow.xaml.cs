@@ -608,6 +608,12 @@ namespace EasyPhotoEditer
             Close();
         }
 
+        private void About_Click(object sender, RoutedEventArgs e)
+        {
+            var aboutDialog = new AboutDialog { Owner = this };
+            aboutDialog.ShowDialog();
+        }
+
         private void LoadImageFromFile(string filePath)
         {
             try
@@ -1182,6 +1188,27 @@ namespace EasyPhotoEditer
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Key == Key.Escape)
+            {
+                bool anyDropDownOpen = (CbFontFamily?.IsDropDownOpen ?? false)
+                    || (CbFontSize?.IsDropDownOpen ?? false)
+                    || (CbStrokeColor?.IsDropDownOpen ?? false)
+                    || (CbStrokeThickness?.IsDropDownOpen ?? false);
+
+                if (!anyDropDownOpen && _currentTool != ToolType.Select)
+                {
+                    if (_isDrawing)
+                    {
+                        _isDrawing = false;
+                        RubberBand.Visibility = Visibility.Collapsed;
+                        ImageCanvas.ReleaseMouseCapture();
+                    }
+                    SetCurrentTool(ToolType.Select);
+                    e.Handled = true;
+                }
+                return;
+            }
+
             if (e.Key is not (Key.Left or Key.Right or Key.Up or Key.Down))
             {
                 return;
